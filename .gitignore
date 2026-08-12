@@ -1,0 +1,10 @@
+.shoka/
+dist/
+.bin/
+*.exe
+*.test
+*.out
+.DS_Store
+
+# Local evaluation / blog artifacts (not published with the tool)
+/eval/

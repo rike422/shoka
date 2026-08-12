@@ -1,0 +1,16 @@
+{
+  "name": "snake-case",
+  "query": "load_user_stats",
+  "want_path": "scripts/stats.gd",
+  "top_k": 5,
+  "files": [
+    {
+      "path": "scripts/stats.gd",
+      "content": "func load_user_stats(id):\n\treturn {}\n"
+    },
+    {
+      "path": "scripts/menu.gd",
+      "content": "func open_menu():\n\tpass\n"
+    }
+  ]
+}

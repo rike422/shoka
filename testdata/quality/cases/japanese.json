@@ -1,0 +1,20 @@
+{
+  "name": "japanese-doc",
+  "query": "有効期限",
+  "want_path": "docs/token.md",
+  "top_k": 5,
+  "files": [
+    {
+      "path": "docs/token.md",
+      "content": "# トークン\n\n有効期限を過ぎたセッションは破棄する。\n"
+    },
+    {
+      "path": "docs/other.md",
+      "content": "別のドキュメントです。\n"
+    },
+    {
+      "path": "code/expiry.go",
+      "content": "package code\n\nconst MaxAge = 3600\n"
+    }
+  ]
+}

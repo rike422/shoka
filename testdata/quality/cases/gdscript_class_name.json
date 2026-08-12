@@ -1,0 +1,20 @@
+{
+  "name": "gdscript_class_name",
+  "query": "UniqueWidget",
+  "want_path": "actors/unique_widget.gd",
+  "top_k": 1,
+  "files": [
+    {
+      "path": "docs/UniqueWidget.md",
+      "content": "# UniqueWidget\n\nDocumentation mentioning UniqueWidget many times.\nUniqueWidget UniqueWidget UniqueWidget.\n"
+    },
+    {
+      "path": "actors/other.gd",
+      "content": "extends Node\nfunc _ready():\n\tvar x = UniqueWidget.new()\n\tpass\n"
+    },
+    {
+      "path": "actors/unique_widget.gd",
+      "content": "extends Node\nclass_name UniqueWidget\nsignal clicked\nfunc do_thing():\n\tpass\n"
+    }
+  ]
+}

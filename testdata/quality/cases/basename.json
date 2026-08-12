@@ -1,0 +1,20 @@
+{
+  "name": "basename-boost",
+  "query": "SessionStore",
+  "want_path": "app/SessionStore.gd",
+  "top_k": 5,
+  "files": [
+    {
+      "path": "app/SessionStore.gd",
+      "content": "extends Node\n\nfunc load_session():\n\tpass\n"
+    },
+    {
+      "path": "app/ui.gd",
+      "content": "extends Control\n# mentions SessionStore in a comment only lightly\n# SessionStore reference\n"
+    },
+    {
+      "path": "README.md",
+      "content": "Sample app.\n"
+    }
+  ]
+}

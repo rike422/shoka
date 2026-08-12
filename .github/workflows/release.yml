@@ -1,0 +1,100 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CGO_ENABLED: "1"
+  GOFLAGS: "-tags=fts5"
+
+jobs:
+  build:
+    name: build (${{ matrix.artifact }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            artifact: shoka-linux-amd64
+          - os: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+            artifact: shoka-linux-arm64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            artifact: shoka-darwin-arm64
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+            artifact: shoka-darwin-amd64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install Linux build tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential
+
+      - name: Build release binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          # Cross-arch Darwin CGO needs explicit clang -arch (native macos runner).
+          if [[ "${{ matrix.goos }}" == "darwin" && "${{ matrix.goarch }}" == "amd64" ]]; then
+            export CC="clang -arch x86_64"
+            export CXX="clang++ -arch x86_64"
+            export CGO_CFLAGS="-arch x86_64"
+            export CGO_LDFLAGS="-arch x86_64"
+          fi
+          go build -trimpath -ldflags='-s -w' -o "dist/${{ matrix.artifact }}" ./cmd/shoka
+          chmod +x "dist/${{ matrix.artifact }}"
+          (cd dist && shasum -a 256 "${{ matrix.artifact }}" > "${{ matrix.artifact }}.sha256")
+          ls -lh "dist/${{ matrix.artifact }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            dist/${{ matrix.artifact }}
+            dist/${{ matrix.artifact }}.sha256
+          if-no-files-found: error
+
+  publish:
+    name: publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List binaries
+        run: ls -lh dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
