@@ -3,7 +3,7 @@ module github.com/rike422/shoka
 go 1.25.5
 
 require (
-	github.com/BurntSushi/toml v1.5.0
+	github.com/BurntSushi/toml v1.6.0
 	github.com/mark3labs/mcp-go v0.32.0
 	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/rike422/shoka/third_party/tree_sitter/tree-sitter-gdscript v0.0.0
