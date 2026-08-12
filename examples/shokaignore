@@ -1,0 +1,10 @@
+# Example project ignore for Godot / noisy trees
+# Copy patterns you need into the target repo's .shokaignore
+
+# Godot sidecars (also built-in skipped by shoka)
+*.uid
+*.import
+
+# Local caches / exports
+.export/
+.mono/

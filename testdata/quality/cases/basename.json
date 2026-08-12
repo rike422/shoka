@@ -1,0 +1,20 @@
+{
+  "name": "basename-boost",
+  "query": "MatchEngine",
+  "want_path": "game/MatchEngine.gd",
+  "top_k": 5,
+  "files": [
+    {
+      "path": "game/MatchEngine.gd",
+      "content": "extends Node\n\nfunc start_match():\n\tpass\n"
+    },
+    {
+      "path": "game/ui.gd",
+      "content": "extends Control\n# mentions MatchEngine in a comment only lightly\n# MatchEngine reference\n"
+    },
+    {
+      "path": "README.md",
+      "content": "Football life game.\n"
+    }
+  ]
+}

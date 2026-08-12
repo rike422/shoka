@@ -1,0 +1,16 @@
+{
+  "name": "qualified-name",
+  "query": "InputManager.handle",
+  "want_path": "core/input.gd",
+  "top_k": 5,
+  "files": [
+    {
+      "path": "core/input.gd",
+      "content": "func tick():\n\tInputManager.handle(event)\n"
+    },
+    {
+      "path": "core/other.gd",
+      "content": "func noop():\n\tpass\n"
+    }
+  ]
+}

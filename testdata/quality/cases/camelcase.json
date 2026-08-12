@@ -1,0 +1,20 @@
+{
+  "name": "camelcase-ident",
+  "query": "getUserProfile",
+  "want_path": "auth/session.go",
+  "top_k": 5,
+  "files": [
+    {
+      "path": "auth/session.go",
+      "content": "package auth\n\nfunc getUserProfile(id string) error {\n\treturn nil\n}\n"
+    },
+    {
+      "path": "auth/README.md",
+      "content": "Authentication helpers.\n"
+    },
+    {
+      "path": "unrelated/util.go",
+      "content": "package util\n\nfunc helper() {}\n"
+    }
+  ]
+}
