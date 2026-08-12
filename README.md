@@ -211,6 +211,13 @@ CGO_ENABLED=1 go test -tags fts5 ./...
 | `internal/treesitter/queries/` | vendored / shoka-owned `tags.scm` |
 | `third_party/tree_sitter/` | vendored GDScript grammar sources |
 
+## References
+
+Built after reading these — BM25 as a candidate search step for coding agents, rather than letting the agent explore the file tree alone:
+
+- Pengyu Wang et al., [*BM25 Wins at Scale: A Scaling Study of Retrieval-Augmented Generation Paradigms*](https://arxiv.org/abs/2607.26497), arXiv:2607.26497, 2026.
+- 須藤英寿 / ナレッジセンス, [*BM25を使用してCodexのトークンの消費を30%抑える*](https://zenn.dev/knowledgesense/articles/9e55a3bb67729c), Zenn, 2026.
+
 ## License
 
 MIT
