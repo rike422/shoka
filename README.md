@@ -187,6 +187,31 @@ Symbols help identifier / `class_name …` queries (e.g. definition file over a 
 
 Symbol extraction roughly doubles full-index time at this size; absolute cost stays a few seconds. Release binary (strip) is on the order of **~13 MB** on macOS arm64 with the six bundled language grammars (TypeScript includes TSX).
 
+### Public corpus: Misskey
+
+Same harness on a named public tree: [`misskey-dev/misskey`](https://github.com/misskey-dev/misskey) @ [`988e3c32a39c`](https://github.com/misskey-dev/misskey/commit/988e3c32a39c1b0a30f71ffcf1f3baf19e5fcd5f) (shallow `develop`, no `pnpm install`). 12 tasks (identifier, exact phrase EN/JA, multi-word flow). Modes: BM25-only, BM25 + TypeScript symbols, ripgrep. Index n=3, search latency n=5 / query.
+
+| | |
+| --- | --- |
+| Indexed files | 2,953 |
+| Chunks | 8,066 |
+| Index DB (+ TypeScript symbols) | ~59 MB |
+
+| Metric | BM25 only | + TypeScript symbols | ripgrep |
+| --- | ---: | ---: | ---: |
+| Success@1 | 0.58 | **0.67** | 0.50 |
+| Success@5 | **0.83** | **0.83** | 0.67 |
+| MRR | 0.68 | **0.74** | 0.58 |
+| Lines to first gold (sum) | **29k** | **29k** | 215–262k |
+| Search latency (mean of means) | 18 ms | 18 ms | 35 ms |
+| Full rebuild | 2.16 ± 0.25 s | 3.38 ± 0.09 s | — |
+
+TypeScript symbols lift Success@1 on class-name lookups (e.g. `NoteCreateService` rank 3 → 1). Exact Japanese phrases in source still rank well on the chunk path; space-separated Japanese concept queries are weaker (tokenizer gap). Read cost stays far below ripgrep when matches are numerous.
+
+Tasks and raw JSON: [`benchmarks/tasks/misskey-988e3c32a39c.json`](benchmarks/tasks/misskey-988e3c32a39c.json), [`benchmarks/results/misskey-988e3c32a39c/`](benchmarks/results/misskey-988e3c32a39c/).
+
+**Baseline note:** ripgrep here is `rg -l -F` with a gold-aware fallback to the longest query token when the full string misses — an optimistic file-list order, not a relevance ranker. MRR for rg should be read as “first-file ordering under that harness,” not as ranked retrieval quality.
+
 ## Development
 
 CGO + `fts5` are required:
@@ -207,6 +232,7 @@ CGO_ENABLED=1 go test -tags fts5 ./...
 | `.golangci.yml` | golangci-lint |
 | `Makefile` | `fmt` / `lint` / `test` / `build` / `check` |
 | `.github/workflows/ci.yml` | tidy, gofmt, lint, test, build |
+| `benchmarks/` | public Misskey (and future) retrieval benches |
 | `testdata/quality/cases/` | search-quality fixtures |
 | `internal/treesitter/queries/` | vendored / shoka-owned `tags.scm` |
 | `third_party/tree_sitter/` | vendored GDScript grammar sources |

@@ -6,5 +6,5 @@ dist/
 *.out
 .DS_Store
 
-# Local evaluation / blog artifacts (not published with the tool)
-/eval/
+# Machine-only bench artifacts (private corpora, raw logs)
+/local/

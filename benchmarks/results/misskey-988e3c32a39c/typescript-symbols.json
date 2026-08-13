@@ -1,0 +1,1269 @@
+{
+  "summary": {
+    "measured_at": "2026-08-13T16:02:05Z",
+    "corpus": {
+      "label": "misskey-dev/misskey@988e3c32a39c1b0a30f71ffcf1f3baf19e5fcd5f",
+      "indexed_files": 2953,
+      "chunks": 8066,
+      "index_db_bytes": 61870080,
+      "note": "Public corpus; exact commit recorded. Counts are after ignore rules."
+    },
+    "protocol": {
+      "metrics_doc": "eval/METRICS.md",
+      "references": [
+        "Zoekt e2e: Recall@1, Recall@5, MRR",
+        "Agent Retrieval Bench: Recall@k coverage, MRR, budgeted yield (approx via lines-to-gold)",
+        "Baseline: ripgrep -l -F"
+      ],
+      "latency_runs": 5,
+      "index_runs": 3,
+      "ranking_deterministic": true
+    },
+    "index": {
+      "full_rebuild_ms": {
+        "runs": 3,
+        "samples": [
+          3478.9,
+          3320.7,
+          3344.0
+        ],
+        "mean": 3381.2,
+        "stdev": 85.4,
+        "mean_sec": 3.381,
+        "stdev_sec": 0.085
+      },
+      "incremental_noop_ms": {
+        "runs": 3,
+        "samples": [
+          145.5,
+          158.0,
+          137.9
+        ],
+        "mean": 147.1,
+        "stdev": 10.1,
+        "mean_sec": 0.147,
+        "stdev_sec": 0.01
+      }
+    },
+    "shoka": {
+      "n": 12,
+      "success_at_1": 0.6667,
+      "success_at_5": 0.8333,
+      "success_at_10": 0.8333,
+      "coverage_at_1": 0.625,
+      "coverage_at_5": 0.75,
+      "coverage_at_10": 0.75,
+      "mrr": 0.7361,
+      "avg_first_rank_when_hit": 1.3,
+      "hit_n": 10,
+      "sum_lines_read": 28652,
+      "sum_files_read": 15,
+      "sum_est_tokens": 307918,
+      "latency_ms_mean_of_means": 17.88
+    },
+    "ripgrep": {
+      "n": 12,
+      "success_at_1": 0.5,
+      "success_at_5": 0.6667,
+      "success_at_10": 0.75,
+      "coverage_at_1": 0.5,
+      "coverage_at_5": 0.6667,
+      "coverage_at_10": 0.75,
+      "mrr": 0.5845,
+      "avg_first_rank_when_hit": 28.5,
+      "hit_n": 12,
+      "sum_lines_read": 262471,
+      "sum_files_read": 106,
+      "sum_est_tokens": 2657726,
+      "latency_ms_mean_of_means": 35.29
+    },
+    "reduction": {
+      "lines_ratio_shoka_over_rg": 0.109,
+      "est_tokens_ratio": 0.116,
+      "lines_saved": 233819,
+      "mrr_delta": 0.1516
+    }
+  },
+  "tasks": [
+    {
+      "id": "symbol-note-create-service",
+      "difficulty": "low",
+      "query": "NoteCreateService",
+      "want_n": 1,
+      "top_k": 10,
+      "shoka": {
+        "metrics": {
+          "first_rank": 1,
+          "first_hit": "packages/backend/src/core/NoteCreateService.ts",
+          "mrr": 1.0,
+          "success_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "coverage_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          }
+        },
+        "n_hits": 10,
+        "paths": [
+          "packages/backend/src/core/NoteCreateService.ts",
+          "packages/backend/src/core/NoteCreateService.ts",
+          "packages/backend/test/unit/NoteCreateService.ts",
+          "packages/backend/src/misc/is-renote.ts",
+          "packages/backend/src/server/api/endpoints/notes/create.ts",
+          "packages/backend/src/core/activitypub/models/ApNoteService.ts",
+          "packages/backend/src/core/activitypub/ApInboxService.ts",
+          ".claude/skills/working-on-backend/references/knowledge/nestjs-di.md",
+          "packages/backend/src/core/activitypub/models/ApNoteService.ts",
+          "packages/backend/src/queue/processors/PostScheduledNoteProcessorService.ts"
+        ],
+        "read_until_hit": {
+          "found": true,
+          "hit_path": "packages/backend/src/core/NoteCreateService.ts",
+          "files_read": 1,
+          "bytes_read": 43798,
+          "lines_read": 1277,
+          "est_tokens": 10949
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 17.81,
+          "stdev": 0.9,
+          "samples": [
+            17.82,
+            17.98,
+            16.56,
+            17.6,
+            19.08
+          ]
+        }
+      },
+      "ripgrep": {
+        "query_used": "NoteCreateService",
+        "n_files_matched": 9,
+        "metrics": {
+          "first_rank": 9,
+          "first_hit": "packages/backend/src/core/NoteCreateService.ts",
+          "mrr": 0.1111111111111111,
+          "success_at": {
+            "1": 0.0,
+            "5": 0.0,
+            "10": 1.0
+          },
+          "coverage_at": {
+            "1": 0.0,
+            "5": 0.0,
+            "10": 1.0
+          }
+        },
+        "paths_top": [
+          ".claude/skills/working-on-backend/references/knowledge/nestjs-di.md",
+          "packages/backend/src/misc/is-renote.ts",
+          "packages/backend/src/queue/processors/PostScheduledNoteProcessorService.ts",
+          "packages/backend/test/unit/NoteCreateService.ts",
+          "packages/backend/src/core/activitypub/ApInboxService.ts",
+          "packages/backend/src/core/activitypub/models/ApNoteService.ts",
+          "packages/backend/src/core/CoreModule.ts",
+          "packages/backend/src/server/api/endpoints/notes/create.ts",
+          "packages/backend/src/core/NoteCreateService.ts"
+        ],
+        "read_until_hit_cap30": {
+          "found": true,
+          "hit_path": "packages/backend/src/core/NoteCreateService.ts",
+          "files_read": 9,
+          "bytes_read": 147456,
+          "lines_read": 4130,
+          "est_tokens": 36864
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 34.64,
+          "stdev": 0.87,
+          "samples": [
+            36.12,
+            33.8,
+            34.44,
+            34.45,
+            34.4
+          ]
+        }
+      }
+    },
+    {
+      "id": "symbol-ap-inbox-service",
+      "difficulty": "low",
+      "query": "ApInboxService",
+      "want_n": 1,
+      "top_k": 10,
+      "shoka": {
+        "metrics": {
+          "first_rank": 1,
+          "first_hit": "packages/backend/src/core/activitypub/ApInboxService.ts",
+          "mrr": 1.0,
+          "success_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "coverage_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          }
+        },
+        "n_hits": 6,
+        "paths": [
+          "packages/backend/src/core/activitypub/ApInboxService.ts",
+          "packages/backend/src/core/activitypub/ApInboxService.ts",
+          "packages/backend/src/queue/processors/InboxProcessorService.ts",
+          "packages/backend/src/queue/processors/InboxProcessorService.ts",
+          "packages/backend/src/core/CoreModule.ts",
+          "packages/backend/src/core/CoreModule.ts"
+        ],
+        "read_until_hit": {
+          "found": true,
+          "hit_path": "packages/backend/src/core/activitypub/ApInboxService.ts",
+          "files_read": 1,
+          "bytes_read": 27261,
+          "lines_read": 814,
+          "est_tokens": 6815
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 18.46,
+          "stdev": 0.8,
+          "samples": [
+            17.08,
+            18.45,
+            18.96,
+            19.01,
+            18.78
+          ]
+        }
+      },
+      "ripgrep": {
+        "query_used": "ApInboxService",
+        "n_files_matched": 3,
+        "metrics": {
+          "first_rank": 3,
+          "first_hit": "packages/backend/src/core/activitypub/ApInboxService.ts",
+          "mrr": 0.3333333333333333,
+          "success_at": {
+            "1": 0.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "coverage_at": {
+            "1": 0.0,
+            "5": 1.0,
+            "10": 1.0
+          }
+        },
+        "paths_top": [
+          "packages/backend/src/queue/processors/InboxProcessorService.ts",
+          "packages/backend/src/core/CoreModule.ts",
+          "packages/backend/src/core/activitypub/ApInboxService.ts"
+        ],
+        "read_until_hit_cap30": {
+          "found": true,
+          "hit_path": "packages/backend/src/core/activitypub/ApInboxService.ts",
+          "files_read": 3,
+          "bytes_read": 77862,
+          "lines_read": 2038,
+          "est_tokens": 19465
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 35.27,
+          "stdev": 0.66,
+          "samples": [
+            34.6,
+            35.5,
+            35.26,
+            34.75,
+            36.24
+          ]
+        }
+      }
+    },
+    {
+      "id": "symbol-fanout-timeline",
+      "difficulty": "low",
+      "query": "FanoutTimelineService",
+      "want_n": 1,
+      "top_k": 10,
+      "shoka": {
+        "metrics": {
+          "first_rank": 1,
+          "first_hit": "packages/backend/src/core/FanoutTimelineService.ts",
+          "mrr": 1.0,
+          "success_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "coverage_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          }
+        },
+        "n_hits": 10,
+        "paths": [
+          "packages/backend/src/core/FanoutTimelineService.ts",
+          "packages/backend/src/core/FanoutTimelineService.ts",
+          "packages/backend/src/core/FanoutTimelineEndpointService.ts",
+          "packages/backend/src/core/RoleService.ts",
+          "packages/backend/src/core/AntennaService.ts",
+          "packages/backend/src/core/NoteCreateService.ts",
+          "packages/backend/src/server/api/endpoints/roles/notes.ts",
+          "packages/backend/src/server/api/endpoints/antennas/notes.ts",
+          "packages/backend/src/core/CoreModule.ts",
+          "packages/backend/src/core/CoreModule.ts"
+        ],
+        "read_until_hit": {
+          "found": true,
+          "hit_path": "packages/backend/src/core/FanoutTimelineService.ts",
+          "files_read": 1,
+          "bytes_read": 4371,
+          "lines_read": 120,
+          "est_tokens": 1092
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 18.32,
+          "stdev": 0.26,
+          "samples": [
+            18.34,
+            18.04,
+            18.54,
+            18.61,
+            18.08
+          ]
+        }
+      },
+      "ripgrep": {
+        "query_used": "FanoutTimelineService",
+        "n_files_matched": 11,
+        "metrics": {
+          "first_rank": 1,
+          "first_hit": "packages/backend/src/core/FanoutTimelineService.ts",
+          "mrr": 1.0,
+          "success_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "coverage_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          }
+        },
+        "paths_top": [
+          "packages/backend/src/core/FanoutTimelineService.ts",
+          "packages/backend/src/server/api/endpoints/roles/notes.ts",
+          "packages/backend/src/core/FanoutTimelineEndpointService.ts",
+          "packages/backend/src/core/AntennaService.ts",
+          "packages/backend/src/server/api/endpoints/users/notes.ts",
+          "packages/backend/src/core/RoleService.ts",
+          "packages/backend/src/server/api/endpoints/notes/hybrid-timeline.ts",
+          "packages/backend/src/core/NoteCreateService.ts",
+          "packages/backend/src/core/CoreModule.ts",
+          "packages/backend/src/server/api/endpoints/antennas/notes.ts"
+        ],
+        "read_until_hit_cap30": {
+          "found": true,
+          "hit_path": "packages/backend/src/core/FanoutTimelineService.ts",
+          "files_read": 1,
+          "bytes_read": 4371,
+          "lines_read": 120,
+          "est_tokens": 1092
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 34.03,
+          "stdev": 0.59,
+          "samples": [
+            33.44,
+            35.0,
+            33.83,
+            34.1,
+            33.76
+          ]
+        }
+      }
+    },
+    {
+      "id": "symbol-antenna-service",
+      "difficulty": "low",
+      "query": "AntennaService",
+      "want_n": 1,
+      "top_k": 10,
+      "shoka": {
+        "metrics": {
+          "first_rank": 1,
+          "first_hit": "packages/backend/src/core/AntennaService.ts",
+          "mrr": 1.0,
+          "success_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "coverage_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          }
+        },
+        "n_hits": 8,
+        "paths": [
+          "packages/backend/src/core/AntennaService.ts",
+          "packages/backend/src/core/entities/UserEntityService.ts",
+          "packages/backend/src/core/AntennaService.ts",
+          "packages/backend/src/core/AccountMoveService.ts",
+          "packages/backend/src/core/NoteCreateService.ts",
+          "packages/backend/src/core/NoteCreateService.ts",
+          "packages/backend/src/core/CoreModule.ts",
+          "packages/backend/src/core/CoreModule.ts"
+        ],
+        "read_until_hit": {
+          "found": true,
+          "hit_path": "packages/backend/src/core/AntennaService.ts",
+          "files_read": 1,
+          "bytes_read": 9533,
+          "lines_read": 267,
+          "est_tokens": 2383
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 18.26,
+          "stdev": 0.35,
+          "samples": [
+            18.18,
+            18.04,
+            18.59,
+            18.65,
+            17.83
+          ]
+        }
+      },
+      "ripgrep": {
+        "query_used": "AntennaService",
+        "n_files_matched": 4,
+        "metrics": {
+          "first_rank": 1,
+          "first_hit": "packages/backend/src/core/AntennaService.ts",
+          "mrr": 1.0,
+          "success_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "coverage_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          }
+        },
+        "paths_top": [
+          "packages/backend/src/core/AntennaService.ts",
+          "packages/backend/src/core/CoreModule.ts",
+          "packages/backend/src/core/AccountMoveService.ts",
+          "packages/backend/src/core/NoteCreateService.ts"
+        ],
+        "read_until_hit_cap30": {
+          "found": true,
+          "hit_path": "packages/backend/src/core/AntennaService.ts",
+          "files_read": 1,
+          "bytes_read": 9533,
+          "lines_read": 267,
+          "est_tokens": 2383
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 34.58,
+          "stdev": 1.14,
+          "samples": [
+            36.2,
+            34.63,
+            33.77,
+            33.28,
+            35.02
+          ]
+        }
+      }
+    },
+    {
+      "id": "en-logging-format-error",
+      "difficulty": "low",
+      "query": "logging.format must be either pretty or json",
+      "want_n": 1,
+      "top_k": 10,
+      "shoka": {
+        "metrics": {
+          "first_rank": 1,
+          "first_hit": "packages/backend/src/logging/logging-runtime.ts",
+          "mrr": 1.0,
+          "success_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "coverage_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          }
+        },
+        "n_hits": 1,
+        "paths": [
+          "packages/backend/src/logging/logging-runtime.ts"
+        ],
+        "read_until_hit": {
+          "found": true,
+          "hit_path": "packages/backend/src/logging/logging-runtime.ts",
+          "files_read": 1,
+          "bytes_read": 2337,
+          "lines_read": 51,
+          "est_tokens": 584
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 16.86,
+          "stdev": 0.82,
+          "samples": [
+            16.25,
+            16.36,
+            17.11,
+            16.38,
+            18.19
+          ]
+        }
+      },
+      "ripgrep": {
+        "query_used": "logging.format must be either pretty or json",
+        "n_files_matched": 1,
+        "metrics": {
+          "first_rank": 1,
+          "first_hit": "packages/backend/src/logging/logging-runtime.ts",
+          "mrr": 1.0,
+          "success_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "coverage_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          }
+        },
+        "paths_top": [
+          "packages/backend/src/logging/logging-runtime.ts"
+        ],
+        "read_until_hit_cap30": {
+          "found": true,
+          "hit_path": "packages/backend/src/logging/logging-runtime.ts",
+          "files_read": 1,
+          "bytes_read": 2337,
+          "lines_read": 51,
+          "est_tokens": 584
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 34.39,
+          "stdev": 0.56,
+          "samples": [
+            33.62,
+            35.14,
+            34.33,
+            34.2,
+            34.68
+          ]
+        }
+      }
+    },
+    {
+      "id": "en-compiled-config-missing",
+      "difficulty": "low",
+      "query": "Compiled configuration file not found. Try running",
+      "want_n": 1,
+      "top_k": 10,
+      "shoka": {
+        "metrics": {
+          "first_rank": 1,
+          "first_hit": "packages/backend/src/config.ts",
+          "mrr": 1.0,
+          "success_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "coverage_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          }
+        },
+        "n_hits": 2,
+        "paths": [
+          "packages/backend/src/config.ts",
+          "packages/backend/src/config.ts"
+        ],
+        "read_until_hit": {
+          "found": true,
+          "hit_path": "packages/backend/src/config.ts",
+          "files_read": 1,
+          "bytes_read": 11861,
+          "lines_read": 378,
+          "est_tokens": 2965
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 16.95,
+          "stdev": 0.67,
+          "samples": [
+            17.35,
+            16.46,
+            16.41,
+            16.61,
+            17.94
+          ]
+        }
+      },
+      "ripgrep": {
+        "query_used": "Compiled configuration file not found. Try running",
+        "n_files_matched": 1,
+        "metrics": {
+          "first_rank": 1,
+          "first_hit": "packages/backend/src/config.ts",
+          "mrr": 1.0,
+          "success_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "coverage_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          }
+        },
+        "paths_top": [
+          "packages/backend/src/config.ts"
+        ],
+        "read_until_hit_cap30": {
+          "found": true,
+          "hit_path": "packages/backend/src/config.ts",
+          "files_read": 1,
+          "bytes_read": 11861,
+          "lines_read": 378,
+          "est_tokens": 2965
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 34.89,
+          "stdev": 0.88,
+          "samples": [
+            36.3,
+            35.17,
+            34.17,
+            34.26,
+            34.56
+          ]
+        }
+      }
+    },
+    {
+      "id": "ja-log-secret-key-comment",
+      "difficulty": "mid",
+      "query": "既定の秘匿対象を判定します",
+      "want_n": 1,
+      "top_k": 10,
+      "shoka": {
+        "metrics": {
+          "first_rank": 1,
+          "first_hit": "packages/backend/src/logging/LogNormalizer.ts",
+          "mrr": 1.0,
+          "success_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "coverage_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          }
+        },
+        "n_hits": 1,
+        "paths": [
+          "packages/backend/src/logging/LogNormalizer.ts"
+        ],
+        "read_until_hit": {
+          "found": true,
+          "hit_path": "packages/backend/src/logging/LogNormalizer.ts",
+          "files_read": 1,
+          "bytes_read": 15326,
+          "lines_read": 400,
+          "est_tokens": 3831
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 17.66,
+          "stdev": 0.79,
+          "samples": [
+            16.86,
+            18.71,
+            17.05,
+            17.46,
+            18.23
+          ]
+        }
+      },
+      "ripgrep": {
+        "query_used": "既定の秘匿対象を判定します",
+        "n_files_matched": 1,
+        "metrics": {
+          "first_rank": 1,
+          "first_hit": "packages/backend/src/logging/LogNormalizer.ts",
+          "mrr": 1.0,
+          "success_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "coverage_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          }
+        },
+        "paths_top": [
+          "packages/backend/src/logging/LogNormalizer.ts"
+        ],
+        "read_until_hit_cap30": {
+          "found": true,
+          "hit_path": "packages/backend/src/logging/LogNormalizer.ts",
+          "files_read": 1,
+          "bytes_read": 15326,
+          "lines_read": 400,
+          "est_tokens": 3831
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 35.32,
+          "stdev": 0.85,
+          "samples": [
+            35.97,
+            36.28,
+            35.34,
+            34.18,
+            34.85
+          ]
+        }
+      }
+    },
+    {
+      "id": "ja-federation-warn-locale",
+      "difficulty": "mid",
+      "query": "連合なしにしても投稿は非公開になりません",
+      "want_n": 1,
+      "top_k": 10,
+      "shoka": {
+        "metrics": {
+          "first_rank": 2,
+          "first_hit": "locales/ja-JP.yml",
+          "mrr": 0.5,
+          "success_at": {
+            "1": 0.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "coverage_at": {
+            "1": 0.0,
+            "5": 1.0,
+            "10": 1.0
+          }
+        },
+        "n_hits": 2,
+        "paths": [
+          "packages/i18n/src/autogen/locale.ts",
+          "locales/ja-JP.yml"
+        ],
+        "read_until_hit": {
+          "found": true,
+          "hit_path": "locales/ja-JP.yml",
+          "files_read": 2,
+          "bytes_read": 564108,
+          "lines_read": 16960,
+          "est_tokens": 141027
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 17.04,
+          "stdev": 0.72,
+          "samples": [
+            17.15,
+            18.24,
+            16.58,
+            16.67,
+            16.53
+          ]
+        }
+      },
+      "ripgrep": {
+        "query_used": "連合なしにしても投稿は非公開になりません",
+        "n_files_matched": 2,
+        "metrics": {
+          "first_rank": 2,
+          "first_hit": "locales/ja-JP.yml",
+          "mrr": 0.5,
+          "success_at": {
+            "1": 0.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "coverage_at": {
+            "1": 0.0,
+            "5": 1.0,
+            "10": 1.0
+          }
+        },
+        "paths_top": [
+          "packages/i18n/src/autogen/locale.ts",
+          "locales/ja-JP.yml"
+        ],
+        "read_until_hit_cap30": {
+          "found": true,
+          "hit_path": "locales/ja-JP.yml",
+          "files_read": 2,
+          "bytes_read": 564108,
+          "lines_read": 16960,
+          "est_tokens": 141027
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 34.58,
+          "stdev": 1.22,
+          "samples": [
+            33.43,
+            36.12,
+            33.65,
+            34.07,
+            35.65
+          ]
+        }
+      }
+    },
+    {
+      "id": "ja-ap-inbox-flow",
+      "difficulty": "high",
+      "query": "ActivityPub inbox 処理",
+      "want_n": 3,
+      "top_k": 10,
+      "shoka": {
+        "metrics": {
+          "first_rank": null,
+          "first_hit": null,
+          "mrr": 0.0,
+          "success_at": {
+            "1": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "coverage_at": {
+            "1": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          }
+        },
+        "n_hits": 2,
+        "paths": [
+          "CHANGELOG.md",
+          "CHANGELOG.md"
+        ],
+        "read_until_hit": {
+          "found": false,
+          "hit_path": null,
+          "files_read": 2,
+          "bytes_read": 532570,
+          "lines_read": 7756,
+          "est_tokens": 133142
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 17.01,
+          "stdev": 0.94,
+          "samples": [
+            17.87,
+            16.57,
+            15.97,
+            16.5,
+            18.14
+          ]
+        }
+      },
+      "ripgrep": {
+        "query_used": "処理",
+        "n_files_matched": 85,
+        "metrics": {
+          "first_rank": 26,
+          "first_hit": "packages/backend/src/queue/processors/InboxProcessorService.ts",
+          "mrr": 0.038461538461538464,
+          "success_at": {
+            "1": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "coverage_at": {
+            "1": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          }
+        },
+        "paths_top": [
+          "scripts/dev.mjs",
+          "locales/ja-KS.yml",
+          "CONTRIBUTING.md",
+          "locales/ja-JP.yml",
+          "CHANGELOG.md",
+          "packages/i18n/src/autogen/locale.ts",
+          "packages-private/diagnostics-shared/src/html.ts",
+          ".claude/skills/working-on-backend/references/knowledge/nestjs-di.md",
+          ".claude/skills/creating-issues-and-prs/SKILL.md",
+          "packages/backend/src/logging/LogNormalizer.ts"
+        ],
+        "read_until_hit_cap30": {
+          "found": true,
+          "hit_path": "packages/backend/src/queue/processors/InboxProcessorService.ts",
+          "files_read": 26,
+          "bytes_read": 1202094,
+          "lines_read": 28435,
+          "est_tokens": 300523
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 34.69,
+          "stdev": 0.62,
+          "samples": [
+            34.8,
+            34.73,
+            33.83,
+            34.53,
+            35.54
+          ]
+        }
+      }
+    },
+    {
+      "id": "en-notes-create-flow",
+      "difficulty": "high",
+      "query": "notes create endpoint service",
+      "want_n": 2,
+      "top_k": 10,
+      "shoka": {
+        "metrics": {
+          "first_rank": 3,
+          "first_hit": "packages/backend/src/server/api/endpoints/notes/create.ts",
+          "mrr": 0.3333333333333333,
+          "success_at": {
+            "1": 0.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "coverage_at": {
+            "1": 0.0,
+            "5": 0.5,
+            "10": 0.5
+          }
+        },
+        "n_hits": 10,
+        "paths": [
+          "packages/backend/src/core/FanoutTimelineEndpointService.ts",
+          "packages/backend/src/server/api/endpoints/i/export-notes.ts",
+          "packages/backend/src/server/api/endpoints/notes/create.ts",
+          "packages/backend/src/server/api/endpoints/notes/drafts/create.ts",
+          "packages/backend/src/server/api/endpoints/notes/favorites/create.ts",
+          "packages/backend/src/server/api/endpoints/notes/thread-muting/create.ts",
+          "packages/backend/src/server/api/endpoints/notes/reactions/create.ts",
+          ".claude/skills/working-on-backend/references/tasks/adding-api-endpoint.md",
+          "packages/backend/test/unit/server/ApiCallService.ts",
+          "packages/backend/src/core/QueryService.ts"
+        ],
+        "read_until_hit": {
+          "found": true,
+          "hit_path": "packages/backend/src/server/api/endpoints/notes/create.ts",
+          "files_read": 3,
+          "bytes_read": 18883,
+          "lines_read": 551,
+          "est_tokens": 4720
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 17.39,
+          "stdev": 0.53,
+          "samples": [
+            17.46,
+            18.03,
+            16.73,
+            16.98,
+            17.74
+          ]
+        }
+      },
+      "ripgrep": {
+        "query_used": "endpoint",
+        "n_files_matched": 544,
+        "metrics": {
+          "first_rank": 260,
+          "first_hit": "packages/backend/src/server/api/endpoints/notes/create.ts",
+          "mrr": 0.0038461538461538464,
+          "success_at": {
+            "1": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "coverage_at": {
+            "1": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          }
+        },
+        "paths_top": [
+          "ROADMAP.md",
+          ".claude/THIRD_PARTY_LICENSES.md",
+          ".agents/skills/working-on-backend/SKILL.md",
+          ".claude/skills/working-on-backend/SKILL.md",
+          ".claude/skills/working-on-backend/references/knowledge/nestjs-di.md",
+          ".claude/commands/harness-audit.md",
+          ".claude/skills/working-on-backend/references/knowledge/backend-testing.md",
+          ".claude/agents/misskey-api-reviewer.md",
+          ".claude/agents/README.md",
+          ".claude/skills/working-on-backend/references/knowledge/api-meta-paramdef.md"
+        ],
+        "read_until_hit_cap30": {
+          "found": false,
+          "hit_path": null,
+          "files_read": 30,
+          "bytes_read": 3438622,
+          "lines_read": 88675,
+          "est_tokens": 859655
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 35.97,
+          "stdev": 0.96,
+          "samples": [
+            35.59,
+            36.08,
+            35.04,
+            35.56,
+            37.55
+          ]
+        }
+      }
+    },
+    {
+      "id": "ja-log-normalize-flow",
+      "difficulty": "high",
+      "query": "ログ属性 秘匿 正規化",
+      "want_n": 1,
+      "top_k": 10,
+      "shoka": {
+        "metrics": {
+          "first_rank": null,
+          "first_hit": null,
+          "mrr": 0.0,
+          "success_at": {
+            "1": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "coverage_at": {
+            "1": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          }
+        },
+        "n_hits": 0,
+        "paths": [],
+        "read_until_hit": {
+          "found": false,
+          "hit_path": null,
+          "files_read": 0,
+          "bytes_read": 0,
+          "lines_read": 0,
+          "est_tokens": 0
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 18.17,
+          "stdev": 0.97,
+          "samples": [
+            16.9,
+            19.01,
+            19.2,
+            18.17,
+            17.59
+          ]
+        }
+      },
+      "ripgrep": {
+        "query_used": "ログ属性",
+        "n_files_matched": 2,
+        "metrics": {
+          "first_rank": 1,
+          "first_hit": "packages/backend/src/logging/LogNormalizer.ts",
+          "mrr": 1.0,
+          "success_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "coverage_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          }
+        },
+        "paths_top": [
+          "packages/backend/src/logging/LogNormalizer.ts",
+          "packages/backend/src/logging/types.ts"
+        ],
+        "read_until_hit_cap30": {
+          "found": true,
+          "hit_path": "packages/backend/src/logging/LogNormalizer.ts",
+          "files_read": 1,
+          "bytes_read": 15326,
+          "lines_read": 400,
+          "est_tokens": 3831
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 36.04,
+          "stdev": 0.8,
+          "samples": [
+            35.3,
+            36.98,
+            36.81,
+            35.37,
+            35.72
+          ]
+        }
+      }
+    },
+    {
+      "id": "en-relay-add-inbox",
+      "difficulty": "mid",
+      "query": "admin relays add inbox",
+      "want_n": 2,
+      "top_k": 10,
+      "shoka": {
+        "metrics": {
+          "first_rank": 1,
+          "first_hit": "packages/backend/src/server/api/endpoints/admin/relays/add.ts",
+          "mrr": 1.0,
+          "success_at": {
+            "1": 1.0,
+            "5": 1.0,
+            "10": 1.0
+          },
+          "coverage_at": {
+            "1": 0.5,
+            "5": 0.5,
+            "10": 0.5
+          }
+        },
+        "n_hits": 10,
+        "paths": [
+          "packages/backend/src/server/api/endpoints/admin/relays/add.ts",
+          "packages/frontend/src/pages/admin/relays.vue",
+          "packages/misskey-js/src/autogen/entities.ts",
+          "packages/misskey-js/src/autogen/endpoint.ts",
+          "packages/misskey-js/etc/misskey-js.api.md",
+          "packages/misskey-js/src/autogen/endpoint.ts",
+          "locales/en-US.yml",
+          "locales/pt-PT.yml",
+          "locales/nl-NL.yml",
+          "locales/id-ID.yml"
+        ],
+        "read_until_hit": {
+          "found": true,
+          "hit_path": "packages/backend/src/server/api/endpoints/admin/relays/add.ts",
+          "files_read": 1,
+          "bytes_read": 1640,
+          "lines_read": 78,
+          "est_tokens": 410
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 20.6,
+          "stdev": 2.3,
+          "samples": [
+            19.54,
+            18.91,
+            18.53,
+            23.83,
+            22.17
+          ]
+        }
+      },
+      "ripgrep": {
+        "query_used": "relays",
+        "n_files_matched": 43,
+        "metrics": {
+          "first_rank": 36,
+          "first_hit": "packages/backend/src/core/RelayService.ts",
+          "mrr": 0.027777777777777776,
+          "success_at": {
+            "1": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          },
+          "coverage_at": {
+            "1": 0.0,
+            "5": 0.0,
+            "10": 0.0
+          }
+        },
+        "paths_top": [
+          "locales/zh-CN.yml",
+          "packages/i18n/src/autogen/locale.ts",
+          "locales/es-ES.yml",
+          "locales/uk-UA.yml",
+          "locales/th-TH.yml",
+          "locales/en-US.yml",
+          "packages/misskey-js/src/autogen/types.ts",
+          "locales/tr-TR.yml",
+          "locales/nl-NL.yml",
+          "packages/misskey-js/src/autogen/endpoint.ts"
+        ],
+        "read_until_hit_cap30": {
+          "found": false,
+          "hit_path": null,
+          "files_read": 30,
+          "bytes_read": 5142024,
+          "lines_read": 120617,
+          "est_tokens": 1285506
+        },
+        "latency_ms": {
+          "runs": 5,
+          "mean": 39.12,
+          "stdev": 2.84,
+          "samples": [
+            36.59,
+            36.45,
+            38.32,
+            42.45,
+            41.76
+          ]
+        }
+      }
+    }
+  ]
+}

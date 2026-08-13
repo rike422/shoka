@@ -1,0 +1,175 @@
+{
+  "corpus": "misskey-dev/misskey",
+  "commit": "988e3c32a39c1b0a30f71ffcf1f3baf19e5fcd5f",
+  "shoka_commit": "717d9bc4236a72ed698d7a4854bb2c280b80b688",
+  "env": {
+    "go": "go version go1.25.5 darwin/arm64",
+    "ripgrep": "ripgrep 15.1.0-cursor5 (rev c3e3c2f7ec)",
+    "uname": "Darwin 25.5.0 arm64"
+  },
+  "protocol": {
+    "tasks": 12,
+    "runs_search": 5,
+    "index_runs": 3,
+    "modes": [
+      "bm25-only",
+      "typescript-symbols",
+      "ripgrep"
+    ],
+    "note": "ripgrep ranking uses gold-aware best token/query fallback in eval/bench-suite.sh; not relevance-ranked. Latency samples remain in raw results."
+  },
+  "corpus_stats": {
+    "label": "misskey-dev/misskey@988e3c32a39c1b0a30f71ffcf1f3baf19e5fcd5f",
+    "indexed_files": 2953,
+    "chunks": 8066,
+    "index_db_bytes": 61870080,
+    "note": "Public corpus; exact commit recorded. Counts are after ignore rules."
+  },
+  "bm25_only": {
+    "retrieval": {
+      "n": 12,
+      "success_at_1": 0.5833,
+      "success_at_5": 0.8333,
+      "success_at_10": 0.8333,
+      "coverage_at_1": 0.5417,
+      "coverage_at_5": 0.75,
+      "coverage_at_10": 0.75,
+      "mrr": 0.6806,
+      "avg_first_rank_when_hit": 1.5,
+      "hit_n": 10,
+      "sum_lines_read": 28946,
+      "sum_files_read": 17,
+      "sum_est_tokens": 309877,
+      "latency_ms_mean_of_means": 18.35
+    },
+    "index": {
+      "full_rebuild_ms": {
+        "runs": 3,
+        "samples": [
+          2440.8,
+          2036.7,
+          1997.6
+        ],
+        "mean": 2158.4,
+        "stdev": 245.4,
+        "mean_sec": 2.158,
+        "stdev_sec": 0.245
+      },
+      "incremental_noop_ms": {
+        "runs": 3,
+        "samples": [
+          138.0,
+          142.8,
+          165.3
+        ],
+        "mean": 148.7,
+        "stdev": 14.6,
+        "mean_sec": 0.149,
+        "stdev_sec": 0.015
+      }
+    },
+    "reduction_vs_rg": {
+      "lines_ratio_shoka_over_rg": 0.134,
+      "est_tokens_ratio": 0.134,
+      "lines_saved": 186645,
+      "mrr_delta": 0.0818
+    }
+  },
+  "typescript_symbols": {
+    "retrieval": {
+      "n": 12,
+      "success_at_1": 0.6667,
+      "success_at_5": 0.8333,
+      "success_at_10": 0.8333,
+      "coverage_at_1": 0.625,
+      "coverage_at_5": 0.75,
+      "coverage_at_10": 0.75,
+      "mrr": 0.7361,
+      "avg_first_rank_when_hit": 1.3,
+      "hit_n": 10,
+      "sum_lines_read": 28652,
+      "sum_files_read": 15,
+      "sum_est_tokens": 307918,
+      "latency_ms_mean_of_means": 17.88
+    },
+    "index": {
+      "full_rebuild_ms": {
+        "runs": 3,
+        "samples": [
+          3478.9,
+          3320.7,
+          3344.0
+        ],
+        "mean": 3381.2,
+        "stdev": 85.4,
+        "mean_sec": 3.381,
+        "stdev_sec": 0.085
+      },
+      "incremental_noop_ms": {
+        "runs": 3,
+        "samples": [
+          145.5,
+          158.0,
+          137.9
+        ],
+        "mean": 147.1,
+        "stdev": 10.1,
+        "mean_sec": 0.147,
+        "stdev_sec": 0.01
+      }
+    },
+    "reduction_vs_rg": {
+      "lines_ratio_shoka_over_rg": 0.109,
+      "est_tokens_ratio": 0.116,
+      "lines_saved": 233819,
+      "mrr_delta": 0.1516
+    }
+  },
+  "ripgrep": {
+    "n": 12,
+    "success_at_1": 0.5,
+    "success_at_5": 0.6667,
+    "success_at_10": 0.75,
+    "coverage_at_1": 0.5,
+    "coverage_at_5": 0.6667,
+    "coverage_at_10": 0.75,
+    "mrr": 0.5845,
+    "avg_first_rank_when_hit": 28.5,
+    "hit_n": 12,
+    "sum_lines_read": 262471,
+    "sum_files_read": 106,
+    "sum_est_tokens": 2657726,
+    "latency_ms_mean_of_means": 35.29
+  },
+  "headline": {
+    "success_at_1": {
+      "bm25_only": 0.5833,
+      "typescript_symbols": 0.6667,
+      "ripgrep": 0.5
+    },
+    "success_at_5": {
+      "bm25_only": 0.8333,
+      "typescript_symbols": 0.8333,
+      "ripgrep": 0.6667
+    },
+    "mrr": {
+      "bm25_only": 0.6806,
+      "typescript_symbols": 0.7361,
+      "ripgrep": 0.5845
+    },
+    "sum_lines_read": {
+      "bm25_only": 28946,
+      "typescript_symbols": 28652,
+      "ripgrep": 262471
+    },
+    "search_latency_ms_mean": {
+      "bm25_only": 18.35,
+      "typescript_symbols": 17.88,
+      "ripgrep": 35.29
+    },
+    "full_index_sec": {
+      "bm25_only": 2.158,
+      "typescript_symbols": 3.381
+    }
+  }
+}

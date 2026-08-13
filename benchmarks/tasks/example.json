@@ -1,0 +1,34 @@
+[
+  {
+    "id": "low-symbol",
+    "difficulty": "low",
+    "query": "REPLACE_WITH_CLASS_OR_TYPE",
+    "prompt": "REPLACE_WITH_CLASS_OR_TYPE はどのファイルで定義されていますか？パスを答えてください。",
+    "want_paths": ["src/"],
+    "notes": "実際のパスに書き換える。basename / 識別子検索が効くかを見る。"
+  },
+  {
+    "id": "low-constant",
+    "difficulty": "low",
+    "query": "REPLACE_WITH_UNIQUE_CONST",
+    "prompt": "定数 REPLACE_WITH_UNIQUE_CONST の定義場所を教えてください。",
+    "want_paths": [],
+    "notes": "リポジトリ内の一意な定数名に置換。"
+  },
+  {
+    "id": "mid-config-split",
+    "difficulty": "mid",
+    "query": "config",
+    "prompt": "設定ファイル群はどこに分かれ、どう参照されていますか？",
+    "want_paths": ["config/"],
+    "notes": "複数ファイル横断。search のあとに Read が必要。"
+  },
+  {
+    "id": "high-flow",
+    "difficulty": "high",
+    "query": "REPLACE_WITH_DOMAIN_PHRASE",
+    "prompt": "主要フローを、関係するスクリプトを挙げて説明してください。",
+    "want_paths": [],
+    "notes": "概念クエリ + 因果。token 差が付きやすい。"
+  }
+]
