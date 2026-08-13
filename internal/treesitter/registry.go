@@ -12,31 +12,47 @@ import (
 
 	sitter "github.com/tree-sitter/go-tree-sitter"
 	tsgo "github.com/tree-sitter/tree-sitter-go/bindings/go"
+	tsjavascript "github.com/tree-sitter/tree-sitter-javascript/bindings/go"
 	tspython "github.com/tree-sitter/tree-sitter-python/bindings/go"
+	tsruby "github.com/tree-sitter/tree-sitter-ruby/bindings/go"
+	tstypescript "github.com/tree-sitter/tree-sitter-typescript/bindings/go"
 
 	tsgdscript "github.com/rike422/shoka/third_party/tree_sitter/tree-sitter-gdscript/bindings/go"
 )
 
-//go:embed queries/go/tags.scm queries/python/tags.scm queries/gdscript/tags.scm
+//go:embed queries/go/tags.scm queries/python/tags.scm queries/gdscript/tags.scm queries/ruby/tags.scm queries/javascript/tags.scm queries/typescript/tags.scm queries/tsx/tags.scm
 var queryFS embed.FS
 
-// BundledLanguages is the allowlist for this build (v1 slice).
-var BundledLanguages = []string{"go", "python", "gdscript"}
+// BundledLanguages is the user-facing allowlist for this build.
+var BundledLanguages = []string{"go", "python", "gdscript", "ruby", "javascript", "typescript"}
 
 // GrammarRevisions pins module versions used in this build (for fingerprint/docs).
 var GrammarRevisions = map[string]string{
-	"go":       "github.com/tree-sitter/tree-sitter-go@v0.25.0",
-	"python":   "github.com/tree-sitter/tree-sitter-python@v0.25.0",
-	"gdscript": "github.com/PrestonKnopp/tree-sitter-gdscript@c5c8fa4861b5a4f04a7e60d97587fc3b6cc5639e",
+	"go":         "github.com/tree-sitter/tree-sitter-go@v0.25.0",
+	"python":     "github.com/tree-sitter/tree-sitter-python@v0.25.0",
+	"gdscript":   "github.com/PrestonKnopp/tree-sitter-gdscript@c5c8fa4861b5a4f04a7e60d97587fc3b6cc5639e",
+	"ruby":       "github.com/tree-sitter/tree-sitter-ruby@v0.23.1",
+	"javascript": "github.com/tree-sitter/tree-sitter-javascript@v0.25.0",
+	"typescript": "github.com/tree-sitter/tree-sitter-typescript@v0.23.2",
+	"tsx":        "github.com/tree-sitter/tree-sitter-typescript@v0.23.2",
 }
 
 const RuntimeVersion = "github.com/tree-sitter/go-tree-sitter@v0.25.0"
 const SymbolTokenizerVersion = "1"
 
 var extToLang = map[string]string{
-	".go": "go",
-	".py": "python",
-	".gd": "gdscript",
+	".go":  "go",
+	".py":  "python",
+	".gd":  "gdscript",
+	".rb":  "ruby",
+	".js":  "javascript",
+	".jsx": "javascript",
+	".mjs": "javascript",
+	".cjs": "javascript",
+	".ts":  "typescript",
+	".tsx": "tsx",
+	".mts": "typescript",
+	".cts": "typescript",
 }
 
 type langEngine struct {
@@ -72,19 +88,18 @@ func NewExtractor(enabled []string) (*Extractor, error) {
 	return ex, nil
 }
 
-// NormalizeEnabled validates and sorts language names.
+// NormalizeEnabled validates and sorts language names into internal engine names.
 // nil → all bundled; empty → none.
+// User-facing "typescript" expands to internal engines "typescript" and "tsx".
 func NormalizeEnabled(enabled []string) ([]string, error) {
 	if enabled == nil {
-		out := append([]string(nil), BundledLanguages...)
-		sort.Strings(out)
-		return out, nil
+		return expandUserLangs(BundledLanguages)
 	}
 	if len(enabled) == 0 {
 		return nil, nil
 	}
-	seen := map[string]struct{}{}
-	var out []string
+	seenUser := map[string]struct{}{}
+	var user []string
 	bundled := map[string]struct{}{}
 	for _, b := range BundledLanguages {
 		bundled[b] = struct{}{}
@@ -97,11 +112,30 @@ func NormalizeEnabled(enabled []string) ([]string, error) {
 		if _, ok := bundled[name]; !ok {
 			return nil, fmt.Errorf("treesitter: unknown or unbound language %q", name)
 		}
-		if _, ok := seen[name]; ok {
+		if _, ok := seenUser[name]; ok {
 			return nil, fmt.Errorf("treesitter: duplicate language %q", name)
+		}
+		seenUser[name] = struct{}{}
+		user = append(user, name)
+	}
+	return expandUserLangs(user)
+}
+
+func expandUserLangs(user []string) ([]string, error) {
+	seen := map[string]struct{}{}
+	var out []string
+	add := func(name string) {
+		if _, ok := seen[name]; ok {
+			return
 		}
 		seen[name] = struct{}{}
 		out = append(out, name)
+	}
+	for _, name := range user {
+		add(name)
+		if name == "typescript" {
+			add("tsx")
+		}
 	}
 	sort.Strings(out)
 	return out, nil
@@ -116,6 +150,14 @@ func newLangEngine(name string) (*langEngine, error) {
 		ptr = tspython.Language()
 	case "gdscript":
 		ptr = tsgdscript.Language()
+	case "ruby":
+		ptr = tsruby.Language()
+	case "javascript":
+		ptr = tsjavascript.Language()
+	case "typescript":
+		ptr = tstypescript.LanguageTypescript()
+	case "tsx":
+		ptr = tstypescript.LanguageTSX()
 	default:
 		return nil, fmt.Errorf("treesitter: no grammar for %q", name)
 	}
@@ -156,20 +198,29 @@ func (e *Extractor) Fingerprint() string {
 	return e.fp
 }
 
-// Enabled returns sorted enabled language names.
+// Enabled returns sorted user-facing language names (tsx folded into typescript).
 func (e *Extractor) Enabled() []string {
 	if e == nil || len(e.byLang) == 0 {
 		return nil
 	}
-	out := make([]string, 0, len(e.byLang))
+	seen := map[string]struct{}{}
+	var out []string
 	for k := range e.byLang {
-		out = append(out, k)
+		name := k
+		if name == "tsx" {
+			name = "typescript"
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
 	}
 	sort.Strings(out)
 	return out
 }
 
-// LanguageForPath maps a relative path to an enabled language.
+// LanguageForPath maps a relative path to an enabled language engine name.
 func (e *Extractor) LanguageForPath(relPath string) (string, bool) {
 	if e == nil || len(e.byLang) == 0 {
 		return "", false

@@ -19,6 +19,19 @@
 - License: MIT (copied as `LICENSE` in that directory)
 - Note: vendored because the published Go module zip collides on case-insensitive filesystems (Swift binding paths).
 
+## tree-sitter-ruby
+- Package: github.com/tree-sitter/tree-sitter-ruby@v0.23.1
+- License: MIT
+
+## tree-sitter-javascript
+- Package: github.com/tree-sitter/tree-sitter-javascript@v0.25.0
+- License: MIT
+
+## tree-sitter-typescript
+- Package: github.com/tree-sitter/tree-sitter-typescript@v0.23.2
+- License: MIT
+- Note: provides both TypeScript and TSX grammars (`LanguageTypescript` / `LanguageTSX`).
+
 ## tags.scm
-- Go / Python: simplified definition-only queries derived from upstream `queries/tags.scm` (no `@reference`).
+- Go / Python / Ruby / JavaScript / TypeScript / TSX: simplified definition-only queries derived from upstream `queries/tags.scm` (no `@reference`, no predicates).
 - GDScript: authored for shoka under `internal/treesitter/queries/gdscript/tags.scm`.

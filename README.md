@@ -5,7 +5,7 @@ Local code search for coding agents. Indexes a repository into SQLite FTS5 and r
 Search combines:
 
 - **Chunk BM25** — line-windowed body / path / basename
-- **Symbol FTS** — tree-sitter definition tags (Go / Python / GDScript), merged for identifier-like queries via weighted RRF
+- **Symbol FTS** — tree-sitter definition tags (Go / Python / GDScript / Ruby / JavaScript / TypeScript), merged for identifier-like queries via weighted RRF
 
 ## Install
 
@@ -76,7 +76,7 @@ Optional file at the **repository root** (not under `.shoka/`, so it can be comm
 # languages = ["go", "gdscript"] # subset only
 ```
 
-Bundled languages in this build: `go`, `python`, `gdscript`.  
+Bundled languages in this build: `go`, `python`, `gdscript`, `ruby`, `javascript`, `typescript` (`.ts` / `.tsx` / `.mts` / `.cts`).  
 Unknown names error at index start. Grammar revisions and licenses: `THIRD_PARTY_NOTICES.md`.
 
 ### `.shokaignore`
@@ -185,7 +185,7 @@ Symbols help identifier / `class_name …` queries (e.g. definition file over a 
 | Incremental (no changes) | 0.07 s | 0.09 s |
 | Index DB | ~28 MB | ~33 MB |
 
-Symbol extraction roughly doubles full-index time at this size; absolute cost stays a few seconds. Release binary (strip) is on the order of **~8 MB** on macOS arm64 with the three bundled grammars.
+Symbol extraction roughly doubles full-index time at this size; absolute cost stays a few seconds. Release binary (strip) is on the order of **~13 MB** on macOS arm64 with the six bundled language grammars (TypeScript includes TSX).
 
 ## Development
 

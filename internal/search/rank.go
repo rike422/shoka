@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 const rrfK = 60.0
@@ -18,7 +19,9 @@ type rankedHit struct {
 	Snippet   string
 	Name      string
 	FromSym   bool
-	Score     float64
+	// defStart is the symbol definition line when known; preferred over chunk start.
+	defStart int
+	Score    float64
 }
 
 // IdentifierLike reports whether q should consult symbols_fts.
@@ -108,23 +111,17 @@ func mergeRRFWithQuery(chunks, symbols []rankedHit, query string, topK, maxPerFi
 				e := &entries[j]
 				if e.hit.Path == h.Path && rangesOverlap(e.hit.StartLine, e.hit.EndLine, h.StartLine, h.EndLine) {
 					e.score += inc
-					if h.FromSym {
-						e.hit.FromSym = true
-						e.hit.Name = h.Name
-						e.hit.StartLine = h.StartLine
-						e.hit.EndLine = h.EndLine
-						if h.Snippet != "" {
-							e.hit.Snippet = h.Snippet
-						}
-					} else if e.hit.Snippet == "" {
-						e.hit.Snippet = h.Snippet
-					}
+					mergeOverlappingHit(&e.hit, h)
 					merged = true
 					break
 				}
 			}
 			if !merged {
-				entries = append(entries, entry{hit: h, score: inc})
+				hit := h
+				if hit.FromSym {
+					hit.defStart = hit.StartLine
+				}
+				entries = append(entries, entry{hit: hit, score: inc})
 			}
 		}
 	}
@@ -158,6 +155,72 @@ func mergeRRFWithQuery(chunks, symbols []rankedHit, query string, topK, maxPerFi
 	return out
 }
 
+// mergeOverlappingHit unions line ranges, anchors StartLine to the first symbol
+// definition when known, and prefers chunk bodies over symbol signatures without
+// letting a later lower-ranked chunk overwrite an earlier chunk body.
+func mergeOverlappingHit(dst *rankedHit, src rankedHit) {
+	end := dst.EndLine
+	if src.EndLine > end {
+		end = src.EndLine
+	}
+	start := dst.StartLine
+	if src.StartLine < start {
+		start = src.StartLine
+	}
+
+	dstHadSym := dst.FromSym
+	srcIsSym := src.FromSym
+	alreadyHasChunkBody := !dstHadSym && strings.TrimSpace(dst.Snippet) != ""
+
+	if srcIsSym {
+		dst.FromSym = true
+		// First symbol wins: later overlapping symbols must not steal Name/defStart.
+		if dst.defStart == 0 {
+			dst.Name = src.Name
+			dst.defStart = src.StartLine
+		}
+	}
+	if dst.defStart > 0 {
+		dst.StartLine = dst.defStart
+	} else {
+		dst.StartLine = start
+	}
+	dst.EndLine = end
+
+	switch {
+	case !srcIsSym && strings.TrimSpace(src.Snippet) != "":
+		if !alreadyHasChunkBody {
+			dst.Snippet = src.Snippet
+		}
+	case srcIsSym && !dstHadSym:
+		if strings.TrimSpace(dst.Snippet) == "" {
+			dst.Snippet = src.Snippet
+		}
+	default:
+		if richerSnippet(src.Snippet, dst.Snippet) {
+			dst.Snippet = src.Snippet
+		}
+	}
+}
+
 func rangesOverlap(a1, a2, b1, b2 int) bool {
 	return a1 <= b2 && b1 <= a2
+}
+
+// richerSnippet reports whether a should replace b as the displayed snippet.
+func richerSnippet(a, b string) bool {
+	a = strings.TrimSpace(a)
+	b = strings.TrimSpace(b)
+	if a == "" {
+		return false
+	}
+	if b == "" {
+		return true
+	}
+	aLines := strings.Count(a, "\n")
+	bLines := strings.Count(b, "\n")
+	if aLines != bLines {
+		return aLines > bLines
+	}
+	return utf8.RuneCountInString(a) > utf8.RuneCountInString(b)
 }

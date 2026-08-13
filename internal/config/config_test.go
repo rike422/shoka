@@ -47,9 +47,22 @@ func TestLoadSubset(t *testing.T) {
 
 func TestLoadUnknownLang(t *testing.T) {
 	dir := t.TempDir()
-	write(t, dir, "[treesitter]\nlanguages = [\"ruby\"]\n")
+	write(t, dir, "[treesitter]\nlanguages = [\"cobol\"]\n")
 	if _, err := config.Load(dir); err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestLoadRubyOK(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, "[treesitter]\nlanguages = [\"ruby\"]\n")
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	langs := cfg.EnabledLanguages()
+	if len(langs) != 1 || langs[0] != "ruby" {
+		t.Fatalf("got %v", langs)
 	}
 }
 

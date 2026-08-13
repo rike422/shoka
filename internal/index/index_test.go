@@ -3,6 +3,7 @@ package index_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/rike422/shoka/internal/index"
@@ -30,6 +31,12 @@ func TestIndexSymbolsAndSearch(t *testing.T) {
 	}
 	if len(hits) == 0 || hits[0].Path != "actors/unique_widget.gd" {
 		t.Fatalf("want gd definition first, got %+v", hits)
+	}
+	if !strings.Contains(hits[0].Snippet, "func do_thing") {
+		t.Fatalf("class-name query should keep chunk body, got %q", hits[0].Snippet)
+	}
+	if hits[0].EndLine <= hits[0].StartLine {
+		t.Fatalf("want expanded line range, got %d-%d", hits[0].StartLine, hits[0].EndLine)
 	}
 }
 
