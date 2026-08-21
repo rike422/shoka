@@ -239,3 +239,70 @@ func TestEmptyQuery(t *testing.T) {
 		t.Fatal("expected empty query error")
 	}
 }
+
+func TestPhraseQueryRelaxesANDWhenEmpty(t *testing.T) {
+	dir := testutil.GitRepo(t)
+	testutil.Write(t, filepath.Join(dir, "notes.md"), "same-moment iteration processed events in the resolver\n")
+	testutil.Write(t, filepath.Join(dir, "budget.md"), "event turn budget is tracked per window\n")
+	testutil.CommitAll(t, dir, "init")
+	if _, err := index.Build(dir, index.Options{}); err != nil {
+		t.Fatal(err)
+	}
+	hits, err := search.Query(dir, "same-moment iteration processed event turn budget", search.Options{TopK: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := map[string]bool{}
+	for _, h := range hits {
+		found[h.Path] = true
+	}
+	if !found["notes.md"] || !found["budget.md"] {
+		t.Fatalf("phrase OR fallback should hit both files, got %+v", hits)
+	}
+}
+
+func TestAbsentIdentifierStaysEmptyDespitePieceMatches(t *testing.T) {
+	dir := testutil.GitRepo(t)
+	testutil.Write(t, filepath.Join(dir, "a.go"), "package a\n\n// the max tick per contests counter lives here\n")
+	testutil.CommitAll(t, dir, "init")
+	if _, err := index.Build(dir, index.Options{}); err != nil {
+		t.Fatal(err)
+	}
+	hits, err := search.Query(dir, "MAX_CONTESTS_PER_TICK", search.Options{TopK: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 0 {
+		t.Fatalf("absent identifier must stay empty, got %+v", hits)
+	}
+}
+
+func TestGDScriptConstDefinitionRanksFirst(t *testing.T) {
+	dir := testutil.GitRepo(t)
+	var b strings.Builder
+	b.WriteString("extends RefCounted\nclass_name ScheduledEvent\n\n")
+	b.WriteString("const KIND_PHYSICAL_CONTEST := \"physical_contest\"\n\n")
+	for i := 0; i < 90; i++ {
+		b.WriteString("# pad line to push later references into another chunk\n")
+	}
+	b.WriteString("static func physical_contest():\n\treturn KIND_PHYSICAL_CONTEST\n\n")
+	b.WriteString("static func rank(kind_value):\n\tmatch kind_value:\n")
+	for i := 0; i < 8; i++ {
+		b.WriteString("\t\tKIND_PHYSICAL_CONTEST:\n\t\t\treturn 1\n")
+	}
+	testutil.Write(t, filepath.Join(dir, "scheduled_event.gd"), b.String())
+	testutil.CommitAll(t, dir, "init")
+	if _, err := index.Build(dir, index.Options{}); err != nil {
+		t.Fatal(err)
+	}
+	hits, err := search.Query(dir, "KIND_PHYSICAL_CONTEST", search.Options{TopK: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) == 0 || hits[0].Path != "scheduled_event.gd" {
+		t.Fatalf("want scheduled_event.gd first, got %+v", hits)
+	}
+	if hits[0].StartLine != 4 {
+		t.Fatalf("want const definition line 4, got %d (%s)", hits[0].StartLine, hits[0].Snippet)
+	}
+}

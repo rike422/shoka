@@ -10,3 +10,6 @@
 
 (signal_statement
   name: (name) @name) @definition.signal
+
+(const_statement
+  name: (name) @name) @definition.constant

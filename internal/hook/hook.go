@@ -13,12 +13,30 @@ const marker = "# shoka-index-hook"
 const hookBody = `#!/bin/sh
 # shoka-index-hook
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
-command -v shoka >/dev/null 2>&1 || exit 0
-shoka index --root "$ROOT" >/dev/null 2>&1 || true
+LOG="$ROOT/.shoka/hook.log"
+mkdir -p "$ROOT/.shoka" || exit 0
+{
+  echo "=== $(date) ==="
+  echo "cwd=$(pwd)"
+  echo "ROOT=$ROOT"
+  echo "PATH=$PATH"
+  echo "GIT_DIR=${GIT_DIR-}"
+  echo "GIT_CONFIG_COUNT=${GIT_CONFIG_COUNT-}"
+  echo "core.hooksPath=$(git config --get core.hooksPath 2>/dev/null || true)"
+  echo "command -v shoka: $(command -v shoka 2>/dev/null || echo NOT_FOUND)"
+} >> "$LOG"
+SHOKA="$(command -v shoka 2>/dev/null)" || {
+  echo "skip: shoka not on PATH" >> "$LOG"
+  exit 0
+}
+echo "running: $SHOKA index --root $ROOT" >> "$LOG"
+"$SHOKA" index --root "$ROOT" >> "$LOG" 2>&1
+echo "index exit=$?" >> "$LOG"
+exit 0
 `
 
 // Install writes .git/hooks/post-commit to run shoka index.
-// Refuses to overwrite an existing foreign hook.
+// Refuses to overwrite an existing foreign hook. Replaces our own hook.
 func Install(projectRoot string) error {
 	hookPath, err := hookFile(projectRoot)
 	if err != nil {
@@ -29,12 +47,10 @@ func Install(projectRoot string) error {
 	}
 	existing, err := os.ReadFile(hookPath)
 	if err == nil {
-		if strings.Contains(string(existing), marker) {
-			return fmt.Errorf("shoka hook already installed")
+		if !strings.Contains(string(existing), marker) {
+			return fmt.Errorf("post-commit hook already exists; remove or merge manually: %s", hookPath)
 		}
-		return fmt.Errorf("post-commit hook already exists; remove or merge manually: %s", hookPath)
-	}
-	if !os.IsNotExist(err) {
+	} else if !os.IsNotExist(err) {
 		return err
 	}
 	return os.WriteFile(hookPath, []byte(hookBody), 0o755)

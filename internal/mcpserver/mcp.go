@@ -42,7 +42,7 @@ func Run(projectRoot string) error {
 	s := server.NewMCPServer("shoka", "0.1.0")
 
 	tool := mcp.NewTool("search",
-		mcp.WithDescription("BM25 code search over the indexed repository. Recommended for locating definitions and relevant files; use Grep/Glob for exact pattern matching or occurrence counting. Returns path, line range, score, and a short snippet. Run `shoka index` if the index is missing or stale."),
+		mcp.WithDescription("BM25 code search over the indexed repository. Recommended for locating definitions and relevant files; use Grep/Glob for exact pattern matching or occurrence counting. Phrase queries retry with OR if AND misses; a missing identifier stays empty. Returns path, line range, score, and a short snippet. Run `shoka index` if the index is missing or stale."),
 		mcp.WithString("query", mcp.Required(), mcp.Description("Search query (identifiers, keywords, Japanese text)")),
 		mcp.WithNumber("top_k", mcp.Description("Max results (default 10, max 50)")),
 	)

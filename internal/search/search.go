@@ -60,6 +60,14 @@ func Query(projectRoot, q string, opt Options) ([]Hit, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(chunks) == 0 && !IdentifierLike(q) {
+		if any, ok := tokenize.FTS5MatchAny(q); ok && any != match {
+			chunks, err = queryChunks(db, any, limit)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
 
 	var symbols []rankedHit
 	if symTok, ok := symbolQueryToken(q); ok && hasSymbolsFTS(db) {

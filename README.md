@@ -147,6 +147,7 @@ Tool: `search(query, top_k?)` — same ranking as the CLI. No separate symbols t
 **Search**
 
 - Always queries chunk FTS (basename > path > body BM25 weights)
+- Phrase queries retry with OR if AND of all tokens misses (identifier queries stay AND, so a missing name stays empty)
 - Identifier-like queries (e.g. `Foo`, `pkg.Type`, `class_name Bar`) also query symbols and merge with weighted RRF + exact-name bonus
 - Caps hits per file; keeps the existing hit JSON shape (`path`, lines, score, snippet)
 

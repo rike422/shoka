@@ -106,6 +106,24 @@ func TestFTS5MatchEmpty(t *testing.T) {
 	}
 }
 
+func TestFTS5MatchAny(t *testing.T) {
+	m, ok := tokenize.FTS5MatchAny(`say "hi"`)
+	if !ok {
+		t.Fatal("expected match")
+	}
+	if m != `"say" OR "hi"` {
+		t.Fatalf("got %q", m)
+	}
+	and, _ := tokenize.FTS5Match("foo bar")
+	any, _ := tokenize.FTS5MatchAny("foo bar")
+	if !strings.Contains(and, " AND ") || !strings.Contains(any, " OR ") {
+		t.Fatalf("and=%q any=%q", and, any)
+	}
+	if _, ok := tokenize.FTS5MatchAny("   "); ok {
+		t.Fatal("expected empty")
+	}
+}
+
 func TestPathTerms(t *testing.T) {
 	got := tokenize.PathTerms("internal/auth/UserService.go")
 	for _, want := range []string{"user", "service", "auth"} {

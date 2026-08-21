@@ -1,0 +1,16 @@
+{
+  "name": "phrase-or-fallback",
+  "query": "same-moment iteration processed event turn budget",
+  "want_path": "docs/notes.md",
+  "top_k": 5,
+  "files": [
+    {
+      "path": "docs/notes.md",
+      "content": "same-moment iteration processed events in the resolver\n"
+    },
+    {
+      "path": "docs/budget.md",
+      "content": "event turn budget is tracked per window\n"
+    }
+  ]
+}

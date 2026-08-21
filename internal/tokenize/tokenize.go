@@ -273,6 +273,15 @@ func QueryTokens(q string) []string {
 
 // FTS5Match builds a safe FTS5 MATCH expression (AND of quoted literals).
 func FTS5Match(q string) (string, bool) {
+	return fts5MatchJoin(q, " AND ")
+}
+
+// FTS5MatchAny is FTS5Match joined with OR (phrase recall when AND is empty).
+func FTS5MatchAny(q string) (string, bool) {
+	return fts5MatchJoin(q, " OR ")
+}
+
+func fts5MatchJoin(q, sep string) (string, bool) {
 	tokens := QueryTokens(q)
 	if len(tokens) == 0 {
 		return "", false
@@ -287,5 +296,5 @@ func FTS5Match(q string) (string, bool) {
 	if len(parts) == 0 {
 		return "", false
 	}
-	return strings.Join(parts, " AND "), true
+	return strings.Join(parts, sep), true
 }

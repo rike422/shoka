@@ -1,0 +1,16 @@
+{
+  "name": "gdscript-const",
+  "query": "KIND_PHYSICAL_CONTEST",
+  "want_path": "scripts/scheduled_event.gd",
+  "top_k": 3,
+  "files": [
+    {
+      "path": "scripts/other.gd",
+      "content": "func handle(event):\n\tif event.kind == ScheduledEvent.KIND_PHYSICAL_CONTEST:\n\t\tpass\n"
+    },
+    {
+      "path": "scripts/scheduled_event.gd",
+      "content": "extends RefCounted\nclass_name ScheduledEvent\nconst KIND_PHYSICAL_CONTEST := \"physical_contest\"\nstatic func physical_contest():\n\treturn KIND_PHYSICAL_CONTEST\n"
+    }
+  ]
+}

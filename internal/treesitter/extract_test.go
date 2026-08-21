@@ -67,6 +67,7 @@ func TestExtractGDScriptClassName(t *testing.T) {
 	defer ex.Close()
 	src := []byte(`extends Node
 class_name UniqueWidget
+const KIND_PHYSICAL_CONTEST := "physical_contest"
 signal clicked
 func do_thing():
 	pass
@@ -87,6 +88,9 @@ func do_thing():
 	}
 	if got["do_thing"] != treesitter.KindFunction {
 		t.Fatalf("func missing: %v", got)
+	}
+	if got["KIND_PHYSICAL_CONTEST"] != "constant" {
+		t.Fatalf("const missing: %v", got)
 	}
 }
 
