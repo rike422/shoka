@@ -33,6 +33,8 @@ func main() {
 		err = cmdMCP(args)
 	case "hook":
 		err = cmdHook(args)
+	case "session":
+		err = cmdSession(args)
 	case "help", "-h", "--help":
 		usage()
 	default:
@@ -56,9 +58,16 @@ Usage:
   shoka mcp [--root PATH]
   shoka hook install [--root PATH]
   shoka hook uninstall [--root PATH]
+  shoka session sync [--agent all|codex|claude|opencode|cursor|pi] [--dry-run] [--json]
+  shoka session list [--agent AGENT] [--repository PATH] [--json]
+  shoka session show SESSION_ID [--json]
+  shoka session search QUERY [--agent AGENT] [--event-type TYPE] [--file PATH] [--json]
+  shoka session export SESSION_ID --output PATH
+  shoka session reindex [--json]
 
 Environment:
-  SHOKA_ROOT   Default project root (overridden by --root)
+  SHOKA_ROOT        Default project root (overridden by --root)
+  SHOKA_STATE_DIR   Session index state directory
 `)
 }
 

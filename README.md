@@ -1,6 +1,6 @@
 # shoka
 
-Local code search for coding agents. Indexes a repository into SQLite FTS5 and returns ranked path / line-range / snippet hits so agents can skip broad Grep/Glob loops.
+Local code and agent-session search for coding agents. Shoka indexes a repository into SQLite FTS5 and can separately collect normalized local transcripts from supported coding agents.
 
 Search combines:
 
@@ -61,6 +61,21 @@ shoka hook uninstall [--root PATH]
 
 # MCP stdio server (search tool only)
 SHOKA_ROOT=/path/to/repo shoka mcp
+
+# Collect local coding-agent sessions into the user-level session index
+shoka session sync --agent all
+shoka session sync --agent codex --dry-run --json
+
+# Browse and search prior sessions
+shoka session list [--agent codex] [--repository /path/to/repo] [--json]
+shoka session show codex:<session-id> [--json]
+shoka session search "sqlite migration" --agent codex --event-type error --json
+
+# Export normalized, source-linked session-evidence/v1 (mode 0600)
+shoka session export codex:<session-id> --output evidence.json
+
+# Delete the derived session index and rebuild it from raw agent logs
+shoka session reindex --json
 ```
 
 Add `.shoka/` to `.gitignore` (the tool warns if missing).
@@ -102,6 +117,67 @@ Supported: comments, `!` negation, `dir/`, rooted `/path`, `*.ext`, and simple `
 4. `index` / `status` may fall back to cwd; `search` / `mcp` error if unresolved or index missing
 
 If HEAD moved since the last `index`, `search` fails with `index stale: run shoka index`.
+
+## Agent sessions
+
+The session index is separate from the per-repository code index. It defaults to
+`~/.local/state/shoka/sessions.db`; set `SHOKA_STATE_DIR` to override it, or
+`XDG_STATE_HOME` to change the state root. The directory is mode `0700` and the
+database is mode `0600` on POSIX systems.
+
+Initial adapters:
+
+| Agent | Source |
+| --- | --- |
+| Codex | `$CODEX_HOME/sessions/**/*.jsonl` and `archived_sessions` (`~/.codex` by default) |
+| Claude Code | `$CLAUDE_CONFIG_DIR/projects/**/*.jsonl` (`~/.claude` by default) |
+| OpenCode | `$OPENCODE_DB` or `$XDG_DATA_HOME/opencode/opencode.db`, opened read-only with an allowlisted schema |
+| Cursor | `~/.cursor/projects/**/agent-transcripts/**/*.jsonl` |
+| Pi | `$PI_CODING_AGENT_SESSION_DIR/**/*.jsonl` or `~/.pi/agent/sessions/**/*.jsonl` |
+
+JSONL sources are incrementally read from the last complete newline. An
+incomplete final line is retried on the next sync; malformed complete lines are
+reported and skipped. Append-only changes preserve existing event IDs, while
+truncation or a changed prefix rebuilds only that source. Missing source files
+remain searchable and are marked `source_missing`.
+
+For a growing JSONL file, Shoka verifies the previous snapshot with the file
+identity and a bounded multi-point guard, resumes the saved SHA-256 state over
+only the appended bytes, and indexes only new retained payloads. A full source
+read is reserved for the initial sync or a replaced/rewritten source; an
+explicit `session reindex` rebuilds everything.
+
+Shoka stores allowlisted normalized events rather than copying raw logs. Hidden
+reasoning/thinking blocks, heartbeat/progress records, and large base64-like
+data are excluded before persistence. Text is retained as bounded head/tail
+snippets: 4 KiB for successful command output, 8 KiB for unknown tool outcomes,
+16 KiB for failures, and 32 KiB for user/assistant messages. Exact duplicate
+occurrences share one retained payload. High-confidence token/key patterns are
+replaced with `[REDACTED]`; this is not a guarantee that arbitrary secrets in a
+transcript can be detected, so review exported evidence before sharing it.
+
+Session search uses contentless FTS5/BM25 over retained snippets. Text discarded
+from the middle of oversized output is intentionally not searchable. Filters
+for agent, session, repository, event type, file, and date are applied as exact
+relational filters, not as search terms.
+
+`session export` writes the deterministic, model-independent
+[`session-evidence/v1`](docs/session-evidence-v1.schema.json) contract. It keeps
+observable tasks, user corrections, commands and outcomes, changed paths,
+explicit failures, observed patch text, the final assistant response, and
+source references. It does not rank lessons or generate Skill candidates;
+downstream tools such as `agent-codify` own that semantic step. Exported JSON is
+bounded to 1 MiB and records deterministic omission counts.
+
+The session database is a disposable derived index. `session reindex` first
+checks that raw sources are discoverable, then deletes `sessions.db` (including
+WAL/SHM files) and rebuilds it. Sync and reindex are mutually exclusive. There
+is no database migration or backup path; rerun reindex after an interrupted
+build.
+
+The Pi adapter is covered by a synthetic version-3 JSONL fixture based on Pi's
+documented session format. It has not yet been verified against a Pi log on the
+development machine.
 
 ## MCP (Cursor / Codex)
 

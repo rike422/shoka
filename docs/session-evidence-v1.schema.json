@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/rike422/shoka/blob/main/docs/session-evidence-v1.schema.json",
+  "title": "Shoka session evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "session",
+    "user_inputs",
+    "commands",
+    "files_changed",
+    "errors",
+    "diff",
+    "omitted"
+  ],
+  "properties": {
+    "schema_version": { "const": "session-evidence/v1" },
+    "session": { "$ref": "#/$defs/session" },
+    "task": { "$ref": "#/$defs/observedText" },
+    "user_inputs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/observedText" }
+    },
+    "commands": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/command" }
+    },
+    "files_changed": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/file" }
+    },
+    "errors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/error" }
+    },
+    "diff": { "$ref": "#/$defs/diff" },
+    "final_response": { "$ref": "#/$defs/observedText" },
+    "omitted": { "$ref": "#/$defs/omitted" }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "hash", "line", "byte_offset", "state"],
+      "properties": {
+        "path": { "type": "string" },
+        "hash": { "type": "string" },
+        "line": { "type": "integer", "minimum": 0 },
+        "byte_offset": { "type": "integer", "minimum": 0 },
+        "state": { "type": "string" }
+      }
+    },
+    "evidenceText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "truncated", "original_bytes", "sha256"],
+      "properties": {
+        "text": { "type": "string" },
+        "truncated": { "type": "boolean" },
+        "original_bytes": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "observedText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "truncated", "original_bytes", "sha256", "source"],
+      "properties": {
+        "text": { "type": "string" },
+        "truncated": { "type": "boolean" },
+        "original_bytes": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "kind": { "enum": ["request", "correction"] },
+        "timestamp": { "type": "string" },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "native_id", "agent", "role_in_tree", "status", "event_count"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "native_id": { "type": "string", "minLength": 1 },
+        "agent": { "enum": ["codex", "claude", "opencode", "cursor", "pi"] },
+        "parent_session_id": { "type": "string" },
+        "role_in_tree": { "enum": ["root", "subagent"] },
+        "repository": { "type": "string" },
+        "started_at": { "type": "string" },
+        "ended_at": { "type": "string" },
+        "status": { "type": "string" },
+        "event_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "kind", "outcome", "source"],
+      "properties": {
+        "command": { "$ref": "#/$defs/evidenceText" },
+        "kind": { "enum": ["command", "test"] },
+        "outcome": { "enum": ["success", "failure", "unknown"] },
+        "exit_code": { "type": "integer" },
+        "output": { "$ref": "#/$defs/evidenceText" },
+        "output_source": { "$ref": "#/$defs/source" },
+        "timestamp": { "type": "string" },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "source"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "timestamp": { "type": "string" },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "text", "source"],
+      "properties": {
+        "kind": { "enum": ["error", "test_failure"] },
+        "text": { "$ref": "#/$defs/evidenceText" },
+        "timestamp": { "type": "string" },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    },
+    "diff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "truncated", "original_bytes", "sha256", "sources"],
+      "properties": {
+        "text": { "type": "string" },
+        "truncated": { "type": "boolean" },
+        "original_bytes": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "sources": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/source" }
+        }
+      }
+    },
+    "omitted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["user_inputs", "commands", "files_changed", "errors", "diff_sources", "duplicate_events"],
+      "properties": {
+        "user_inputs": { "type": "integer", "minimum": 0 },
+        "commands": { "type": "integer", "minimum": 0 },
+        "files_changed": { "type": "integer", "minimum": 0 },
+        "errors": { "type": "integer", "minimum": 0 },
+        "diff_sources": { "type": "integer", "minimum": 0 },
+        "duplicate_events": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}
