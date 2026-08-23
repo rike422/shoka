@@ -74,6 +74,13 @@ shoka session search "sqlite migration" --agent codex --event-type error --json
 # Export normalized, source-linked session-evidence/v1 (mode 0600)
 shoka session export codex:<session-id> --output evidence.json
 
+# List all observable design-direction episodes without a text query
+shoka transcript episode list --agent codex --event-type design_direction --from 2026-08-01 --to 2026-08-31 --json
+
+# Search and export correction/result episodes only
+shoka transcript episode search "migration test failed" --agent codex --before 3 --after 8 --json
+shoka transcript episode export codex:<transcript-id>:<event-id>:test_failure --output episode.json --before 3 --after 8
+
 # Delete the derived session index and rebuild it from raw agent logs
 shoka session reindex --json
 ```
@@ -89,6 +96,11 @@ Optional file at the **repository root** (not under `.shoka/`, so it can be comm
 # omit this file → all bundled languages enabled
 # languages = []                 # disable symbol extraction
 # languages = ["go", "gdscript"] # subset only
+
+[projects.aliases]
+# Optional explicit identity for clones/worktrees whose Git metadata is
+# unavailable or ambiguous.
+# "/absolute/path/to/clone" = "company/product"
 ```
 
 Bundled languages in this build: `go`, `python`, `gdscript`, `ruby`, `javascript`, `typescript` (`.ts` / `.tsx` / `.mts` / `.cts`).  
@@ -169,11 +181,30 @@ source references. It does not rank lessons or generate Skill candidates;
 downstream tools such as `agent-codify` own that semantic step. Exported JSON is
 bounded to 1 MiB and records deterministic omission counts.
 
+`transcript episode list` is the queryless enumeration path for downstream
+analysis. Its `--event-type` selects an observable episode trigger such as
+`design_direction` or `scope_revision`; `--from` and `--to` filter the trigger
+timestamp, not merely the enclosing session lifetime.
+
+`transcript episode search` and `transcript episode export` use the separate
+[`transcript-episode/v1`](docs/transcript-episode-v1.schema.json) contract. Episodes
+start only at observable correction anchors, including repeated requests,
+scope/design directions, explicit errors, and test failures. They retain
+bounded context, actions, outcomes, task status, source event IDs/hashes, and
+search reasons. Search output reports raw event, session, task-lineage, and
+project counts separately. Episode derivation never generates Skills, infers
+root causes, or synchronizes sessions implicitly.
+
 The session database is a disposable derived index. `session reindex` first
 checks that raw sources are discoverable, then deletes `sessions.db` (including
 WAL/SHM files) and rebuilds it. Sync and reindex are mutually exclusive. There
 is no database migration or backup path; rerun reindex after an interrupted
 build.
+
+The `session` commands and database fields refer to the native agent-session
+index. The public correction/result evidence layer is exposed as
+`transcript episode`, so a transcript is the evidence stream while
+`native_session_id` remains an upstream identity concept.
 
 The Pi adapter is covered by a synthetic version-3 JSONL fixture based on Pi's
 documented session format. It has not yet been verified against a Pi log on the

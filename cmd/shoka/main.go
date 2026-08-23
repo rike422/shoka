@@ -35,6 +35,8 @@ func main() {
 		err = cmdHook(args)
 	case "session":
 		err = cmdSession(args)
+	case "transcript":
+		err = cmdTranscript(args)
 	case "help", "-h", "--help":
 		usage()
 	default:
@@ -64,6 +66,9 @@ Usage:
   shoka session search QUERY [--agent AGENT] [--event-type TYPE] [--file PATH] [--json]
   shoka session export SESSION_ID --output PATH
   shoka session reindex [--json]
+  shoka transcript episode list [--agent AGENT] [--event-type TYPE] [--from DATE] [--to DATE] [--json]
+  shoka transcript episode search QUERY [--before N] [--after N] [--json]
+  shoka transcript episode export EPISODE_ID --output PATH
 
 Environment:
   SHOKA_ROOT        Default project root (overridden by --root)

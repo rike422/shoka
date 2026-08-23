@@ -26,6 +26,9 @@ func TestListShowSearchAndFilters(t *testing.T) {
 	if sessions[0].Repository == "" {
 		t.Fatalf("repository was not retained: %+v", sessions[0])
 	}
+	if sessions[0].ProjectID == "" || sessions[0].WorkspaceID == "" || sessions[0].TaskLineageID == "" {
+		t.Fatalf("session identity was not retained: %+v", sessions[0])
+	}
 	normalizedRepository, err := ListSessions(ctx, env, Filter{Repository: sessions[0].Repository + string(os.PathSeparator)})
 	if err != nil {
 		t.Fatal(err)
@@ -112,6 +115,9 @@ func TestSubagentsAreHiddenByDefault(t *testing.T) {
 	if len(all) != 2 {
 		t.Fatalf("include-subagents should contain two sessions: %+v", all)
 	}
+	if all[0].ProjectID == "" || all[1].ProjectID == "" || all[0].ProjectID != all[1].ProjectID || all[0].TaskLineageID != all[1].TaskLineageID {
+		t.Fatalf("parent and child identity diverged: %+v", all)
+	}
 	child, err := ShowSession(context.Background(), env, "child-session")
 	if err != nil {
 		t.Fatal(err)
@@ -196,6 +202,24 @@ func TestSessionEvidenceSchemaDocumentMatchesProducerVersion(t *testing.T) {
 	}
 	if schema.Properties["schema_version"].Const != sessionEvidenceVersion {
 		t.Fatalf("schema document version drifted: %q != %q", schema.Properties["schema_version"].Const, sessionEvidenceVersion)
+	}
+}
+
+func TestTranscriptEpisodeSchemaDocumentMatchesProducerVersion(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "docs", "transcript-episode-v1.schema.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var schema struct {
+		Properties map[string]struct {
+			Const string `json:"const"`
+		} `json:"properties"`
+	}
+	if err := json.Unmarshal(data, &schema); err != nil {
+		t.Fatal(err)
+	}
+	if schema.Properties["schema_version"].Const != transcriptEpisodeVersion {
+		t.Fatalf("episode schema document drifted: %q != %q", schema.Properties["schema_version"].Const, transcriptEpisodeVersion)
 	}
 }
 

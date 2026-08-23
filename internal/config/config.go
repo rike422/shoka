@@ -16,6 +16,13 @@ const FileName = ".shoka.toml"
 // Config is the subset of .shoka.toml shoka understands.
 type Config struct {
 	Treesitter TreesitterConfig `toml:"treesitter"`
+	Projects   ProjectsConfig   `toml:"projects"`
+}
+
+// ProjectsConfig contains explicit identity aliases for repositories whose
+// remote metadata cannot prove that two workspaces are the same project.
+type ProjectsConfig struct {
+	Aliases map[string]string `toml:"aliases"`
 }
 
 // TreesitterConfig selects bundled languages for symbol extraction.

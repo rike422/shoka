@@ -20,6 +20,9 @@ type Filter struct {
 	Agent            Agent
 	Session          string
 	Repository       string
+	ProjectID        string
+	WorkspaceID      string
+	TaskLineageID    string
 	File             string
 	Kind             EventKind
 	From             time.Time
@@ -39,6 +42,9 @@ type SessionInfo struct {
 	Title            string `json:"title,omitempty"`
 	Cwd              string `json:"cwd,omitempty"`
 	Repository       string `json:"repository,omitempty"`
+	ProjectID        string `json:"project_id,omitempty"`
+	WorkspaceID      string `json:"workspace_id,omitempty"`
+	TaskLineageID    string `json:"task_lineage_id,omitempty"`
 	StartedAt        string `json:"started_at,omitempty"`
 	EndedAt          string `json:"ended_at,omitempty"`
 	Status           string `json:"status"`
@@ -94,10 +100,13 @@ type SessionDetail struct {
 
 // SearchHit is one BM25-ranked canonical event.
 type SearchHit struct {
-	SessionUID string  `json:"session_id"`
-	Agent      Agent   `json:"agent"`
-	Repository string  `json:"repository,omitempty"`
-	Score      float64 `json:"score"`
+	SessionUID    string  `json:"session_id"`
+	Agent         Agent   `json:"agent"`
+	Repository    string  `json:"repository,omitempty"`
+	ProjectID     string  `json:"project_id,omitempty"`
+	TaskLineageID string  `json:"task_lineage_id,omitempty"`
+	Score         float64 `json:"score"`
+	RawEventCount int     `json:"-"`
 	Event
 }
 
@@ -138,7 +147,7 @@ func ListSessions(ctx context.Context, env Environment, filter Filter) ([]Sessio
 	defer func() { _ = store.Close() }()
 	query := `
 		SELECT s.id,s.session_uid,s.agent,s.native_id,s.parent_session_uid,s.role_in_tree,
-		       s.title,s.cwd,s.repository,s.started_at,s.ended_at,s.status,s.event_count,
+		       s.title,s.cwd,s.repository,s.project_id,s.workspace_id,s.task_lineage_id,s.started_at,s.ended_at,s.status,s.event_count,
 		       EXISTS(
 		         SELECT 1 FROM events e JOIN sources src ON src.id=e.source_id
 		         WHERE e.session_id=s.id AND src.state='missing'
@@ -159,6 +168,18 @@ func ListSessions(ctx context.Context, env Environment, filter Filter) ([]Sessio
 	if filter.Repository != "" {
 		query += ` AND s.repository=?`
 		args = append(args, filter.Repository)
+	}
+	if filter.ProjectID != "" {
+		query += ` AND s.project_id=?`
+		args = append(args, filter.ProjectID)
+	}
+	if filter.WorkspaceID != "" {
+		query += ` AND s.workspace_id=?`
+		args = append(args, filter.WorkspaceID)
+	}
+	if filter.TaskLineageID != "" {
+		query += ` AND s.task_lineage_id=?`
+		args = append(args, filter.TaskLineageID)
 	}
 	if !filter.From.IsZero() {
 		query += ` AND s.ended_at>=?`
@@ -217,7 +238,8 @@ func SearchSessions(ctx context.Context, env Environment, queryText string, filt
 	}
 	defer func() { _ = store.Close() }()
 	query := `
-		SELECT s.session_uid,s.agent,s.repository,
+		SELECT s.session_uid,s.agent,s.repository,s.project_id,s.task_lineage_id,
+		       (SELECT COUNT(*) FROM events e3 WHERE e3.content_id=c.id),
 		       e.id,e.record_ordinal,e.part_ordinal,e.native_event_id,e.parent_native_id,e.ts,
 		       e.role,e.kind,c.text,c.text_truncated,c.text_original_bytes,c.text_sha256,
 		       e.tool_name,e.call_id,c.command,c.command_truncated,c.command_original_bytes,c.command_sha256,
@@ -247,6 +269,18 @@ func SearchSessions(ctx context.Context, env Environment, queryText string, filt
 	if filter.Repository != "" {
 		query += ` AND s.repository=?`
 		args = append(args, filter.Repository)
+	}
+	if filter.ProjectID != "" {
+		query += ` AND s.project_id=?`
+		args = append(args, filter.ProjectID)
+	}
+	if filter.WorkspaceID != "" {
+		query += ` AND s.workspace_id=?`
+		args = append(args, filter.WorkspaceID)
+	}
+	if filter.TaskLineageID != "" {
+		query += ` AND s.task_lineage_id=?`
+		args = append(args, filter.TaskLineageID)
 	}
 	if filter.Kind != "" {
 		query += ` AND e.kind=?`
@@ -278,7 +312,7 @@ func SearchSessions(ctx context.Context, env Environment, queryText string, filt
 		var exitCode, duplicateOf sql.NullInt64
 		var files string
 		if err := rows.Scan(
-			&hit.SessionUID, &hit.Agent, &hit.Repository,
+			&hit.SessionUID, &hit.Agent, &hit.Repository, &hit.ProjectID, &hit.TaskLineageID, &hit.RawEventCount,
 			&hit.ID, &hit.RecordOrdinal, &hit.PartOrdinal, &hit.NativeEventID, &hit.ParentNativeID, &timestamp,
 			&hit.Role, &hit.Kind, &hit.Text, &hit.TextTruncated, &hit.TextOriginalBytes, &hit.TextSHA256,
 			&hit.ToolName, &hit.CallID, &hit.Command, &hit.CommandTruncated, &hit.CommandOriginalBytes, &hit.CommandSHA256,
@@ -305,7 +339,7 @@ func normalizeFilter(filter Filter) Filter {
 func (s *Store) resolveSession(ctx context.Context, id string) (SessionInfo, error) {
 	base := `
 		SELECT s.id,s.session_uid,s.agent,s.native_id,s.parent_session_uid,s.role_in_tree,
-		       s.title,s.cwd,s.repository,s.started_at,s.ended_at,s.status,s.event_count,
+		       s.title,s.cwd,s.repository,s.project_id,s.workspace_id,s.task_lineage_id,s.started_at,s.ended_at,s.status,s.event_count,
 		       EXISTS(
 		         SELECT 1 FROM events e JOIN sources src ON src.id=e.source_id
 		         WHERE e.session_id=s.id AND src.state='missing'
@@ -351,7 +385,8 @@ func scanSession(scanner rowScanner) (SessionInfo, error) {
 	if err := scanner.Scan(
 		&session.ID, &session.SessionUID, &session.Agent, &session.NativeID,
 		&session.ParentSessionUID, &session.RoleInTree, &session.Title, &session.Cwd,
-		&session.Repository, &started, &ended, &session.Status, &session.EventCount,
+		&session.Repository, &session.ProjectID, &session.WorkspaceID, &session.TaskLineageID,
+		&started, &ended, &session.Status, &session.EventCount,
 		&session.SourceMissing,
 	); err != nil {
 		return SessionInfo{}, err

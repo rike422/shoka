@@ -325,19 +325,30 @@ func inspectJSONLSource(agent Agent, path string) (Source, error) {
 	scanner.Buffer(make([]byte, 64<<10), 1<<20)
 	for line := 0; line < 64 && scanner.Scan(); line++ {
 		var envelope struct {
-			Type      string          `json:"type"`
-			Timestamp string          `json:"timestamp"`
-			SessionID string          `json:"sessionId"`
-			Cwd       string          `json:"cwd"`
-			Payload   json.RawMessage `json:"payload"`
-			ID        string          `json:"id"`
-			Title     string          `json:"title"`
+			Type            string          `json:"type"`
+			Timestamp       string          `json:"timestamp"`
+			SessionID       string          `json:"sessionId"`
+			ParentSessionID string          `json:"parentSessionId"`
+			ParentID        string          `json:"parent_id"`
+			ContinuationOf  string          `json:"continuation_of"`
+			ForkedFrom      string          `json:"forked_from"`
+			TaskLineageID   string          `json:"task_lineage_id"`
+			Cwd             string          `json:"cwd"`
+			Payload         json.RawMessage `json:"payload"`
+			ID              string          `json:"id"`
+			Title           string          `json:"title"`
 		}
 		if err := json.Unmarshal(scanner.Bytes(), &envelope); err != nil {
 			continue
 		}
 		if envelope.SessionID != "" {
 			source.NativeSessionID = envelope.SessionID
+		}
+		if source.ParentNativeSessionID == "" {
+			source.ParentNativeSessionID = firstNonEmpty(envelope.ParentSessionID, envelope.ParentID, envelope.ContinuationOf, envelope.ForkedFrom)
+		}
+		if source.TaskLineageID == "" {
+			source.TaskLineageID = envelope.TaskLineageID
 		}
 		if envelope.ID != "" && envelope.Type == "session" {
 			source.NativeSessionID = envelope.ID
@@ -353,10 +364,15 @@ func inspectJSONLSource(agent Agent, path string) (Source, error) {
 		}
 		if envelope.Type == "session_meta" {
 			var payload struct {
-				ID        string `json:"id"`
-				SessionID string `json:"session_id"`
-				Cwd       string `json:"cwd"`
-				Timestamp string `json:"timestamp"`
+				ID              string `json:"id"`
+				SessionID       string `json:"session_id"`
+				ParentSessionID string `json:"parent_session_id"`
+				ParentID        string `json:"parent_id"`
+				ContinuationOf  string `json:"continuation_of"`
+				ForkedFrom      string `json:"forked_from"`
+				TaskLineageID   string `json:"task_lineage_id"`
+				Cwd             string `json:"cwd"`
+				Timestamp       string `json:"timestamp"`
 			}
 			if json.Unmarshal(envelope.Payload, &payload) == nil {
 				if payload.SessionID != "" {
@@ -366,6 +382,12 @@ func inspectJSONLSource(agent Agent, path string) (Source, error) {
 				}
 				if payload.Cwd != "" {
 					source.Cwd = payload.Cwd
+				}
+				if source.ParentNativeSessionID == "" {
+					source.ParentNativeSessionID = firstNonEmpty(payload.ParentSessionID, payload.ParentID, payload.ContinuationOf, payload.ForkedFrom)
+				}
+				if source.TaskLineageID == "" {
+					source.TaskLineageID = payload.TaskLineageID
 				}
 				if parsed := parseTimestamp(payload.Timestamp); !parsed.IsZero() {
 					source.StartedAt = parsed
@@ -380,6 +402,15 @@ func inspectJSONLSource(agent Agent, path string) (Source, error) {
 		return source, err
 	}
 	return source, nil
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 func parentSessionFromPath(path string) string {

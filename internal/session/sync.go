@@ -213,6 +213,7 @@ func syncDryRun(ctx context.Context, env Environment, agents []Agent) (SyncStats
 }
 
 func (s *Store) applySource(ctx context.Context, adapter Adapter, plan ReadPlan, stats *SyncStats) error {
+	plan.Source = enrichSourceIdentity(plan.Source)
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err

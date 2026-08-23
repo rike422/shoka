@@ -40,6 +40,189 @@ func cmdSession(args []string) error {
 	}
 }
 
+func cmdTranscript(args []string) error {
+	if len(args) < 2 || args[0] != "episode" {
+		return fmt.Errorf("usage: shoka transcript episode list|search|export")
+	}
+	args = args[1:]
+	switch args[0] {
+	case "list":
+		return cmdTranscriptEpisodeList(args[1:])
+	case "search":
+		return cmdTranscriptEpisodeSearch(args[1:])
+	case "export":
+		return cmdTranscriptEpisodeExport(args[1:])
+	default:
+		return fmt.Errorf("unknown transcript episode subcommand: %s", args[0])
+	}
+}
+
+func cmdTranscriptEpisodeList(args []string) error {
+	spec := filterOptionSpec(false)
+	addEpisodeOptionSpec(spec)
+	parsed, err := parseCommandOptions(args, spec)
+	if err != nil {
+		return err
+	}
+	if len(parsed.positionals) != 0 {
+		return fmt.Errorf("transcript episode list does not accept positional arguments")
+	}
+	filter, err := transcriptEpisodeFilterFromOptions(parsed)
+	if err != nil {
+		return err
+	}
+	options, err := episodeOptionsFromParsed(parsed)
+	if err != nil {
+		return err
+	}
+	env, err := shokasession.CurrentEnvironment()
+	if err != nil {
+		return err
+	}
+	episodes, err := shokasession.ListTranscriptEpisodes(context.Background(), env, filter, options)
+	if err != nil {
+		return err
+	}
+	if parsed.booleans["--json"] {
+		return encodeJSON(episodes)
+	}
+	for _, episode := range episodes {
+		fmt.Printf("%s  %s  trigger=%s event=%d status=%s\n", episode.Trigger.Timestamp, episode.EpisodeID, episode.Trigger.Type, episode.Trigger.EventID, episode.TaskStatus)
+	}
+	return nil
+}
+
+func transcriptEpisodeFilterFromOptions(parsed parsedOptions) (shokasession.TranscriptEpisodeFilter, error) {
+	values := make(map[string]string, len(parsed.values))
+	for key, value := range parsed.values {
+		values[key] = value
+	}
+	eventType := values["--event-type"]
+	values["--event-type"] = ""
+	baseFilter, err := filterFromOptions(parsedOptions{values: values, booleans: parsed.booleans, positionals: parsed.positionals})
+	if err != nil {
+		return shokasession.TranscriptEpisodeFilter{}, err
+	}
+	filter := shokasession.TranscriptEpisodeFilter{Filter: baseFilter}
+	if eventType == "" {
+		return filter, nil
+	}
+	anchorType, err := parseAnchorType(eventType)
+	if err != nil {
+		return shokasession.TranscriptEpisodeFilter{}, err
+	}
+	filter.AnchorType = anchorType
+	return filter, nil
+}
+
+func cmdTranscriptEpisodeSearch(args []string) error {
+	spec := filterOptionSpec(false)
+	addEpisodeOptionSpec(spec)
+	parsed, err := parseCommandOptions(args, spec)
+	if err != nil {
+		return err
+	}
+	if len(parsed.positionals) == 0 {
+		return fmt.Errorf("transcript episode search requires a QUERY")
+	}
+	filter, err := filterFromOptions(parsed)
+	if err != nil {
+		return err
+	}
+	options, err := episodeOptionsFromParsed(parsed)
+	if err != nil {
+		return err
+	}
+	env, err := shokasession.CurrentEnvironment()
+	if err != nil {
+		return err
+	}
+	result, err := shokasession.SearchTranscriptEpisodes(context.Background(), env, strings.Join(parsed.positionals, " "), filter, options)
+	if err != nil {
+		return err
+	}
+	if parsed.booleans["--json"] {
+		return encodeJSON(result)
+	}
+	fmt.Printf("raw events: %d  sessions: %d  task lineages: %d  projects: %d  episodes: %d\n",
+		result.Summary.RawEvents, result.Summary.Sessions, result.Summary.TaskLineages, result.Summary.Projects, len(result.Episodes))
+	for _, episode := range result.Episodes {
+		fmt.Printf("%s  trigger=%s event=%d status=%s\n", episode.EpisodeID, episode.Trigger.Type, episode.Trigger.EventID, episode.TaskStatus)
+		for _, reason := range episode.SearchReasons {
+			fmt.Printf("  reason: %s\n", reason)
+		}
+	}
+	return nil
+}
+
+func cmdTranscriptEpisodeExport(args []string) error {
+	spec := map[string]bool{"--output": true}
+	addEpisodeOptionSpec(spec)
+	parsed, err := parseCommandOptions(args, spec)
+	if err != nil {
+		return err
+	}
+	if len(parsed.positionals) != 1 || parsed.values["--output"] == "" {
+		return fmt.Errorf("usage: shoka transcript episode export EPISODE_ID --output PATH")
+	}
+	options, err := episodeOptionsFromParsed(parsed)
+	if err != nil {
+		return err
+	}
+	env, err := shokasession.CurrentEnvironment()
+	if err != nil {
+		return err
+	}
+	if err := shokasession.WriteTranscriptEpisodeEvidence(context.Background(), env, parsed.positionals[0], parsed.values["--output"], options); err != nil {
+		return err
+	}
+	fmt.Printf("exported episode evidence: %s\n", parsed.values["--output"])
+	return nil
+}
+
+func addEpisodeOptionSpec(spec map[string]bool) {
+	spec["--before"] = true
+	spec["--after"] = true
+	spec["--byte-budget"] = true
+	spec["--token-budget"] = true
+}
+
+func parseAnchorType(value string) (shokasession.AnchorType, error) {
+	valid := []shokasession.AnchorType{
+		shokasession.AnchorUserCorrection,
+		shokasession.AnchorError,
+		shokasession.AnchorTestFailure,
+		shokasession.AnchorRequirementRestatement,
+		shokasession.AnchorScopeRevision,
+		shokasession.AnchorDesignDirection,
+	}
+	for _, anchorType := range valid {
+		if string(anchorType) == value {
+			return anchorType, nil
+		}
+	}
+	return "", fmt.Errorf("unknown transcript episode event type %q", value)
+}
+
+func episodeOptionsFromParsed(parsed parsedOptions) (shokasession.EpisodeOptions, error) {
+	options := shokasession.EpisodeOptions{}
+	for flag, target := range map[string]*int{
+		"--before": &options.Before, "--after": &options.After,
+		"--byte-budget": &options.ByteBudget, "--token-budget": &options.TokenBudget,
+	} {
+		value := parsed.values[flag]
+		if value == "" {
+			continue
+		}
+		parsedValue, err := strconv.Atoi(value)
+		if err != nil || parsedValue < 0 {
+			return options, fmt.Errorf("invalid %s: %s", flag, value)
+		}
+		*target = parsedValue
+	}
+	return options, nil
+}
+
 func cmdSessionSync(args []string) error {
 	parsed, err := parseCommandOptions(args, map[string]bool{"--agent": true, "--dry-run": false, "--json": false})
 	if err != nil {
@@ -222,15 +405,18 @@ func cmdSessionReindex(args []string) error {
 
 func filterOptionSpec(includeSubagents bool) map[string]bool {
 	spec := map[string]bool{
-		"--agent":      true,
-		"--session":    true,
-		"--repository": true,
-		"--file":       true,
-		"--event-type": true,
-		"--from":       true,
-		"--to":         true,
-		"--top":        true,
-		"--json":       false,
+		"--agent":           true,
+		"--session":         true,
+		"--repository":      true,
+		"--project-id":      true,
+		"--workspace-id":    true,
+		"--task-lineage-id": true,
+		"--file":            true,
+		"--event-type":      true,
+		"--from":            true,
+		"--to":              true,
+		"--top":             true,
+		"--json":            false,
 	}
 	if includeSubagents {
 		spec["--include-subagents"] = false
@@ -249,6 +435,9 @@ func filterFromOptions(parsed parsedOptions) (shokasession.Filter, error) {
 	}
 	filter.Session = parsed.values["--session"]
 	filter.Repository = parsed.values["--repository"]
+	filter.ProjectID = parsed.values["--project-id"]
+	filter.WorkspaceID = parsed.values["--workspace-id"]
+	filter.TaskLineageID = parsed.values["--task-lineage-id"]
 	filter.File = parsed.values["--file"]
 	if value := parsed.values["--event-type"]; value != "" {
 		kind, err := parseEventKind(value)

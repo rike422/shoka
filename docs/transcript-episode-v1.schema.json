@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/rike422/shoka/blob/main/docs/transcript-episode-v1.schema.json",
+  "title": "Shoka transcript episode v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "episode_id", "transcript_id", "native_session_id", "task_lineage_id", "project_id", "trigger", "context_before", "corrections", "actions_after", "outcomes", "task_status", "source_event_ids", "omitted"],
+  "properties": {
+    "schema_version": { "const": "transcript-episode/v1" },
+    "episode_id": { "type": "string", "minLength": 1 },
+    "transcript_id": { "type": "string", "minLength": 1 },
+    "native_session_id": { "type": "string", "minLength": 1 },
+    "task_lineage_id": { "type": "string", "minLength": 1 },
+    "project_id": { "type": "string", "minLength": 1 },
+    "workspace_id": { "type": "string" },
+    "trigger": { "$ref": "#/$defs/trigger" },
+    "context_before": { "type": "array", "items": { "$ref": "#/$defs/evidence" } },
+    "corrections": { "type": "array", "items": { "$ref": "#/$defs/evidence" } },
+    "actions_after": { "type": "array", "items": { "$ref": "#/$defs/evidence" } },
+    "outcomes": { "type": "array", "items": { "$ref": "#/$defs/outcome" } },
+    "final_report": { "$ref": "#/$defs/evidence" },
+    "additional_corrections": { "type": "array", "items": { "$ref": "#/$defs/evidence" } },
+    "task_status": { "enum": ["complete", "failed", "unknown"] },
+    "source_event_ids": { "type": "array", "items": { "type": "integer", "minimum": 1 } },
+    "search_reasons": { "type": "array", "items": { "type": "string" } },
+    "omitted": { "$ref": "#/$defs/omitted" }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "hash", "line", "byte_offset", "state"],
+      "properties": {
+        "path": { "type": "string" },
+        "hash": { "type": "string" },
+        "line": { "type": "integer", "minimum": 0 },
+        "byte_offset": { "type": "integer", "minimum": 0 },
+        "state": { "type": "string" }
+      }
+    },
+    "trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "event_id"],
+      "properties": {
+        "type": { "enum": ["user_correction", "error", "test_failure", "requirement_restatement", "scope_revision", "design_direction"] },
+        "event_id": { "type": "integer", "minimum": 1 },
+        "timestamp": { "type": "string" },
+        "reason": { "type": "string" }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_id", "event_type", "role", "source"],
+      "properties": {
+        "event_id": { "type": "integer", "minimum": 1 },
+        "event_type": { "type": "string" },
+        "role": { "enum": ["user", "assistant", "tool", "system"] },
+        "timestamp": { "type": "string" },
+        "text": { "type": "string" },
+        "command": { "type": "string" },
+        "diff": { "type": "string" },
+        "files": { "type": "array", "items": { "type": "string" } },
+        "exit_code": { "type": "integer" },
+        "outcome": { "enum": ["success", "failure", "unknown"] },
+        "content_hash": { "type": "string" },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_id", "type", "outcome", "source"],
+      "properties": {
+        "event_id": { "type": "integer", "minimum": 1 },
+        "type": { "type": "string" },
+        "outcome": { "enum": ["success", "failure", "unknown"] },
+        "text": { "type": "string" },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    },
+    "omitted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["events", "bytes", "tokens", "context_before", "actions_after", "outcomes"],
+      "properties": {
+        "events": { "type": "integer", "minimum": 0 },
+        "bytes": { "type": "integer", "minimum": 0 },
+        "tokens": { "type": "integer", "minimum": 0 },
+        "context_before": { "type": "integer", "minimum": 0 },
+        "actions_after": { "type": "integer", "minimum": 0 },
+        "outcomes": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

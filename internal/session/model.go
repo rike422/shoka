@@ -69,6 +69,9 @@ type Source struct {
 	Path                  string
 	NativeSessionID       string
 	ParentNativeSessionID string
+	TaskLineageID         string
+	ProjectID             string
+	WorkspaceID           string
 	Cwd                   string
 	Title                 string
 	StartedAt             time.Time

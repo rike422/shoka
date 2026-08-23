@@ -66,6 +66,18 @@ func TestLoadRubyOK(t *testing.T) {
 	}
 }
 
+func TestLoadProjectAliases(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, "[projects.aliases]\n\"/tmp/clone\" = \"shared-project\"\n")
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Projects.Aliases["/tmp/clone"] != "shared-project" {
+		t.Fatalf("aliases = %#v", cfg.Projects.Aliases)
+	}
+}
+
 func TestLoadUnknownKey(t *testing.T) {
 	dir := t.TempDir()
 	write(t, dir, "[treesitter]\nfoo = 1\n")

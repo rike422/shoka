@@ -20,7 +20,7 @@ import (
 	"github.com/rike422/shoka/internal/tokenize"
 )
 
-const sessionSchemaVersion = "3"
+const sessionSchemaVersion = "4"
 
 // Store owns the user-level session index.
 type Store struct {
@@ -125,6 +125,9 @@ func (s *Store) init() error {
 			title TEXT NOT NULL DEFAULT '',
 			cwd TEXT NOT NULL DEFAULT '',
 			repository TEXT NOT NULL DEFAULT '',
+			project_id TEXT NOT NULL DEFAULT '',
+			workspace_id TEXT NOT NULL DEFAULT '',
+			task_lineage_id TEXT NOT NULL DEFAULT '',
 			started_at INTEGER NOT NULL DEFAULT 0,
 			ended_at INTEGER NOT NULL DEFAULT 0,
 			status TEXT NOT NULL DEFAULT 'unknown',
@@ -132,6 +135,8 @@ func (s *Store) init() error {
 		)`,
 		`CREATE INDEX sessions_agent_time ON sessions(agent, started_at DESC)`,
 		`CREATE INDEX sessions_repo_time ON sessions(repository, started_at DESC)`,
+		`CREATE INDEX sessions_project_time ON sessions(project_id, started_at DESC)`,
+		`CREATE INDEX sessions_lineage_time ON sessions(task_lineage_id, started_at DESC)`,
 		`CREATE INDEX sessions_parent ON sessions(parent_session_uid)`,
 		`CREATE TABLE event_contents (
 			id INTEGER PRIMARY KEY,
@@ -191,7 +196,7 @@ func (s *Store) init() error {
 			tokenize = 'unicode61'
 		)`,
 		`INSERT INTO meta(key,value) VALUES('schema_version','` + sessionSchemaVersion + `')`,
-		`INSERT INTO meta(key,value) VALUES('derive_version','session-evidence-v1')`,
+		`INSERT INTO meta(key,value) VALUES('derive_version','session-evidence-v1+transcript-episode-v1')`,
 		`INSERT INTO meta(key,value) VALUES('redaction_version','1')`,
 	}
 	tx, err := s.db.Begin()
@@ -285,6 +290,35 @@ func ensureSession(tx *sql.Tx, source Source, record Record, fallback time.Time)
 		cwd = source.Cwd
 	}
 	repository := resolveRepository(cwd)
+	projectID := source.ProjectID
+	workspaceID := source.WorkspaceID
+	if projectID == "" || workspaceID == "" {
+		identity, err := ResolveProjectIdentity(cwd, loadProjectAliases(cwd))
+		if err == nil {
+			if projectID == "" {
+				projectID = identity.ID
+			}
+			if workspaceID == "" {
+				workspaceID = identity.WorkspaceID
+			}
+		}
+	}
+	if projectID == "" {
+		projectID = stableProjectID("repo:" + repository)
+	}
+	if workspaceID == "" {
+		workspaceID = stableWorkspaceID(cwd)
+	}
+	lineageID := source.TaskLineageID
+	if lineageID == "" && parentUID != "" {
+		_ = tx.QueryRow(`SELECT task_lineage_id FROM sessions WHERE session_uid=?`, parentUID).Scan(&lineageID)
+		if lineageID == "" {
+			lineageID = stableTaskLineageID(projectID, parentUID)
+		}
+	}
+	if lineageID == "" {
+		lineageID = stableTaskLineageID(projectID, uid)
+	}
 	timestamp := record.Timestamp
 	if timestamp.IsZero() {
 		timestamp = source.StartedAt
@@ -295,17 +329,20 @@ func ensureSession(tx *sql.Tx, source Source, record Record, fallback time.Time)
 	millis := timestamp.UnixMilli()
 	_, err := tx.Exec(`
 		INSERT INTO sessions(
-			session_uid,agent,native_id,parent_session_uid,role_in_tree,title,cwd,repository,started_at,ended_at
-		) VALUES(?,?,?,?,?,?,?,?,?,?)
+			 session_uid,agent,native_id,parent_session_uid,role_in_tree,title,cwd,repository,project_id,workspace_id,task_lineage_id,started_at,ended_at
+		) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
 		ON CONFLICT(session_uid) DO UPDATE SET
 			parent_session_uid=CASE WHEN excluded.parent_session_uid<>'' THEN excluded.parent_session_uid ELSE sessions.parent_session_uid END,
 			role_in_tree=CASE WHEN excluded.role_in_tree='subagent' THEN 'subagent' ELSE sessions.role_in_tree END,
 			title=CASE WHEN excluded.title<>'' THEN excluded.title ELSE sessions.title END,
 			cwd=CASE WHEN sessions.cwd='' THEN excluded.cwd ELSE sessions.cwd END,
 			repository=CASE WHEN sessions.repository='' THEN excluded.repository ELSE sessions.repository END,
+			project_id=CASE WHEN sessions.project_id='' THEN excluded.project_id ELSE sessions.project_id END,
+			workspace_id=CASE WHEN sessions.workspace_id='' THEN excluded.workspace_id ELSE sessions.workspace_id END,
+			task_lineage_id=CASE WHEN sessions.task_lineage_id='' THEN excluded.task_lineage_id ELSE sessions.task_lineage_id END,
 			started_at=CASE WHEN sessions.started_at=0 OR excluded.started_at<sessions.started_at THEN excluded.started_at ELSE sessions.started_at END,
 			ended_at=CASE WHEN excluded.ended_at>sessions.ended_at THEN excluded.ended_at ELSE sessions.ended_at END`,
-		uid, source.Agent, nativeID, parentUID, roleInTree, source.Title, cwd, repository, millis, millis)
+		uid, source.Agent, nativeID, parentUID, roleInTree, source.Title, cwd, repository, projectID, workspaceID, lineageID, millis, millis)
 	if err != nil {
 		return 0, err
 	}
