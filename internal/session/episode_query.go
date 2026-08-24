@@ -196,6 +196,10 @@ func listTranscriptCandidateEvents(ctx context.Context, env Environment, session
 			query += ` AND e.ts<=?`
 			args = append(args, filter.To.UTC().UnixMilli())
 		}
+		if filter.File != "" {
+			query += ` AND EXISTS(SELECT 1 FROM event_files f WHERE f.content_id=e.content_id AND f.path=?)`
+			args = append(args, filter.File)
+		}
 		query += ` ORDER BY e.session_id,e.ts,e.source_id,e.record_ordinal,e.part_ordinal,e.id`
 		rows, err := store.db.QueryContext(ctx, query, args...)
 		if err != nil {

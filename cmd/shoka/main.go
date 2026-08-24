@@ -87,8 +87,8 @@ Usage:
   shoka session search QUERY [--agent AGENT] [--event-type TYPE] [--file PATH] [--json]
   shoka session export SESSION_ID --output PATH
   shoka session reindex [--json]
-  shoka transcript episode list [--agent AGENT] [--event-type TYPE] [--from DATE] [--to DATE] [--json] [--verbose]
-  shoka transcript episode summary [--agent AGENT] [--event-type TYPE] [--from DATE] [--to DATE] [--json] [--verbose]
+  shoka transcript episode list [--agent AGENT] [--event-type TYPE] [--file PATH] [--from DATE] [--to DATE] [--json] [--verbose]
+  shoka transcript episode summary [--agent AGENT] [--event-type TYPE] [--file PATH] [--from DATE] [--to DATE] [--json] [--verbose]
   shoka transcript episode search QUERY [--before N] [--after N] [--json]
   shoka transcript episode export EPISODE_ID --output PATH
 

@@ -62,6 +62,19 @@ func TestListTranscriptEpisodeSummaries(t *testing.T) {
 	}
 }
 
+func TestListTranscriptEpisodeSummariesFiltersCandidateFile(t *testing.T) {
+	env := syncCodexDesignFixture(t)
+	summaries, err := ListTranscriptEpisodeSummaries(context.Background(), env, TranscriptEpisodeFilter{
+		Filter: Filter{Agent: AgentCodex, File: "/no/such/file.go"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summaries) != 0 {
+		t.Fatalf("episodes for unrelated file = %+v", summaries)
+	}
+}
+
 func TestTranscriptEpisodeSummaryEnumerationIsNotCappedByInteractiveTopK(t *testing.T) {
 	env := syncEpisodeCorpus(t, 64)
 	from := time.Date(2026, 8, 20, 0, 0, 0, 0, time.UTC)
