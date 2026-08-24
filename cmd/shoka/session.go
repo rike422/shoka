@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -42,12 +43,14 @@ func cmdSession(env shokasession.Environment, args []string) error {
 
 func cmdTranscript(env shokasession.Environment, args []string) error {
 	if len(args) < 2 || args[0] != "episode" {
-		return fmt.Errorf("usage: shoka transcript episode list|search|export")
+		return fmt.Errorf("usage: shoka transcript episode list|summary|search|export")
 	}
 	args = args[1:]
 	switch args[0] {
 	case "list":
 		return cmdTranscriptEpisodeList(env, args[1:])
+	case "summary":
+		return cmdTranscriptEpisodeSummary(env, args[1:])
 	case "search":
 		return cmdTranscriptEpisodeSearch(env, args[1:])
 	case "export":
@@ -63,7 +66,6 @@ func cmdTranscriptEpisodeList(env shokasession.Environment, args []string) error
 	}
 	spec := filterOptionSpec(false)
 	delete(spec, "--top")
-	addEpisodeOptionSpec(spec)
 	spec["--verbose"] = false
 	parsed, err := parseCommandOptions(args, spec)
 	if err != nil {
@@ -76,22 +78,14 @@ func cmdTranscriptEpisodeList(env shokasession.Environment, args []string) error
 	if err != nil {
 		return err
 	}
-	filter = applyDefaultTranscriptEpisodeListRange(filter, parsed, time.Now().UTC())
+	filter = applyDefaultTranscriptEpisodeRange(filter, parsed, time.Now().UTC())
 	filter.Verbose = parsed.booleans["--verbose"]
-	options, err := episodeOptionsFromParsed(parsed)
+	summaries, err := shokasession.ListTranscriptEpisodeSummaries(context.Background(), env, filter)
 	if err != nil {
 		return err
 	}
 	if parsed.booleans["--json"] {
-		episodes, err := shokasession.ListTranscriptEpisodes(context.Background(), env, filter, options)
-		if err != nil {
-			return err
-		}
-		return encodeJSON(episodes)
-	}
-	summaries, err := shokasession.ListTranscriptEpisodeSummaries(context.Background(), env, filter)
-	if err != nil {
-		return err
+		return encodeJSON(summaries)
 	}
 	for _, summary := range summaries {
 		fmt.Printf("%s  %s  trigger=%s event=%d status=%s\n", summary.Trigger.Timestamp, summary.EpisodeID, summary.Trigger.Type, summary.Trigger.EventID, summary.TaskStatus)
@@ -99,7 +93,50 @@ func cmdTranscriptEpisodeList(env shokasession.Environment, args []string) error
 	return nil
 }
 
-func applyDefaultTranscriptEpisodeListRange(filter shokasession.TranscriptEpisodeFilter, parsed parsedOptions, now time.Time) shokasession.TranscriptEpisodeFilter {
+func cmdTranscriptEpisodeSummary(env shokasession.Environment, args []string) error {
+	spec := filterOptionSpec(false)
+	delete(spec, "--top")
+	spec["--verbose"] = false
+	parsed, err := parseCommandOptions(args, spec)
+	if err != nil {
+		return err
+	}
+	if len(parsed.positionals) != 0 {
+		return fmt.Errorf("transcript episode summary does not accept positional arguments")
+	}
+	filter, err := transcriptEpisodeFilterFromOptions(parsed)
+	if err != nil {
+		return err
+	}
+	filter = applyDefaultTranscriptEpisodeRange(filter, parsed, time.Now().UTC())
+	filter.Verbose = parsed.booleans["--verbose"]
+	summary, err := shokasession.SummarizeTranscriptEpisodes(context.Background(), env, filter)
+	if err != nil {
+		return err
+	}
+	if parsed.booleans["--json"] {
+		return encodeJSON(summary)
+	}
+	fmt.Printf("episodes=%d sessions=%d task_lineages=%d projects=%d\n", summary.Episodes, summary.Sessions, summary.TaskLineages, summary.Projects)
+	for _, trigger := range sortedCountKeys(summary.ByTrigger) {
+		fmt.Printf("trigger=%s count=%d\n", trigger, summary.ByTrigger[trigger])
+	}
+	for _, status := range sortedCountKeys(summary.ByStatus) {
+		fmt.Printf("status=%s count=%d\n", status, summary.ByStatus[status])
+	}
+	return nil
+}
+
+func sortedCountKeys(counts map[string]int) []string {
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func applyDefaultTranscriptEpisodeRange(filter shokasession.TranscriptEpisodeFilter, parsed parsedOptions, now time.Time) shokasession.TranscriptEpisodeFilter {
 	if parsed.values["--from"] == "" && parsed.values["--to"] == "" {
 		filter.Filter.From = now.Add(-7 * 24 * time.Hour)
 		filter.Filter.To = now

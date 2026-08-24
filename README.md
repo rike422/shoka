@@ -77,6 +77,9 @@ shoka session export codex:<session-id> --output evidence.json
 # List all observable design-direction episodes without a text query
 shoka transcript episode list --agent codex --event-type design_direction --from 2026-08-01 --to 2026-08-31 --json
 
+# Count candidate episodes without loading evidence payloads
+shoka transcript episode summary --agent codex --from 2026-08-01 --to 2026-08-31 --json
+
 # Search and export correction/result episodes only
 shoka transcript episode search "migration test failed" --agent codex --before 3 --after 8 --json
 shoka transcript episode export codex:<transcript-id>:<event-id>:test_failure --output episode.json --before 3 --after 8
@@ -202,9 +205,12 @@ bounded to 1 MiB and records deterministic omission counts.
 analysis. Its `--event-type` selects an observable episode trigger such as
 `design_direction` or `scope_revision`; `--from` and `--to` filter the trigger
 timestamp, not merely the enclosing session lifetime. When neither date is
-specified, list defaults to the previous seven days. Plain-text output uses a
-metadata-only path; JSON output includes bounded context by default. Add
-`--verbose` to print progress and memory diagnostics to stderr without
+specified, list defaults to the previous seven days. Both plain-text and JSON
+output contain only episode IDs and metadata; they never include context or
+evidence payloads. `transcript episode summary` uses the same lightweight path
+to report episode, session, task-lineage, and project counts plus trigger and
+task-status totals. Use explicit date windows to divide larger collections.
+Add `--verbose` to print progress and memory diagnostics to stderr without
 printing transcript content.
 
 `transcript episode search` and `transcript episode export` use the separate

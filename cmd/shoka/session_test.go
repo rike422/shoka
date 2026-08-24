@@ -15,13 +15,13 @@ import (
 func TestDefaultTranscriptEpisodeListRange(t *testing.T) {
 	now := time.Date(2026, 8, 23, 12, 0, 0, 0, time.UTC)
 	parsed := parsedOptions{values: map[string]string{}, booleans: map[string]bool{}}
-	filter := applyDefaultTranscriptEpisodeListRange(shokasession.TranscriptEpisodeFilter{}, parsed, now)
+	filter := applyDefaultTranscriptEpisodeRange(shokasession.TranscriptEpisodeFilter{}, parsed, now)
 	if !filter.Filter.From.Equal(now.Add(-7*24*time.Hour)) || !filter.Filter.To.Equal(now) {
 		t.Fatalf("default range = %s..%s", filter.Filter.From, filter.Filter.To)
 	}
 
 	explicit := parsedOptions{values: map[string]string{"--from": "2026-08-01"}, booleans: map[string]bool{}}
-	filter = applyDefaultTranscriptEpisodeListRange(shokasession.TranscriptEpisodeFilter{Filter: shokasession.Filter{From: now.Add(-30 * 24 * time.Hour)}}, explicit, now)
+	filter = applyDefaultTranscriptEpisodeRange(shokasession.TranscriptEpisodeFilter{Filter: shokasession.Filter{From: now.Add(-30 * 24 * time.Hour)}}, explicit, now)
 	if !filter.Filter.From.Equal(now.Add(-30*24*time.Hour)) || !filter.Filter.To.IsZero() {
 		t.Fatalf("explicit range was overwritten = %s..%s", filter.Filter.From, filter.Filter.To)
 	}
@@ -99,6 +99,12 @@ func TestSessionCLIWorkflow(t *testing.T) {
 	if len(listedEpisodes) != 1 {
 		t.Fatalf("unexpected design episodes: %+v", listedEpisodes)
 	}
+	if _, ok := listedEpisodes[0]["context_before"]; ok {
+		t.Fatalf("episode list included detail payload: %+v", listedEpisodes[0])
+	}
+	if _, ok := listedEpisodes[0]["schema_version"]; ok {
+		t.Fatalf("episode list included export schema: %+v", listedEpisodes[0])
+	}
 	trigger, ok := listedEpisodes[0]["trigger"].(map[string]any)
 	if !ok || trigger["type"] != "design_direction" || trigger["timestamp"] != "2026-08-20T01:00:06Z" {
 		t.Fatalf("unexpected design trigger: %+v", listedEpisodes[0]["trigger"])
@@ -108,6 +114,16 @@ func TestSessionCLIWorkflow(t *testing.T) {
 	})
 	if !strings.Contains(plainEpisodeListOutput, "2026-08-20T01:00:06Z") || !strings.Contains(plainEpisodeListOutput, "trigger=design_direction") {
 		t.Fatalf("episode list output lacks date or trigger: %s", plainEpisodeListOutput)
+	}
+	summaryOutput := captureStdout(t, func() error {
+		return cmdTranscript(env, []string{"episode", "summary", "--agent", "codex", "--event-type", "design_direction", "--from", "2026-08-20", "--to", "2026-08-20", "--json"})
+	})
+	var episodeSummary map[string]any
+	if err := json.Unmarshal([]byte(summaryOutput), &episodeSummary); err != nil {
+		t.Fatalf("episode summary JSON: %v\n%s", err, summaryOutput)
+	}
+	if episodeSummary["episodes"] != float64(1) || episodeSummary["sessions"] != float64(1) {
+		t.Fatalf("unexpected episode summary: %+v", episodeSummary)
 	}
 
 	searchOutput := captureStdout(t, func() error {
@@ -238,6 +254,10 @@ func TestSessionCLIRejectsUnknownFlags(t *testing.T) {
 	err = cmdTranscript(env, []string{"episode", "list", "--top", "10"})
 	if err == nil || !strings.Contains(err.Error(), "unknown flag") {
 		t.Fatalf("episode list accepted an incomplete TopK contract: %v", err)
+	}
+	err = cmdTranscript(env, []string{"episode", "list", "--before", "3"})
+	if err == nil || !strings.Contains(err.Error(), "unknown flag") {
+		t.Fatalf("episode list accepted detail options: %v", err)
 	}
 }
 

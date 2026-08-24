@@ -46,32 +46,15 @@ type TranscriptEpisodeSummary struct {
 	TaskStatus      string            `json:"task_status"`
 }
 
-// BuildTranscriptEpisodes derives all deterministic episodes in transcripts matching
-// the metadata filter. The index is read-only and no sync is performed.
-func BuildTranscriptEpisodes(ctx context.Context, env Environment, filter Filter, options EpisodeOptions) ([]TranscriptEpisode, error) {
-	return ListTranscriptEpisodes(ctx, env, TranscriptEpisodeFilter{Filter: filter}, options)
-}
-
-// ListTranscriptEpisodes derives all observable episodes matching metadata,
-// trigger type, and trigger timestamp. It never performs a text search or sync.
-func ListTranscriptEpisodes(ctx context.Context, env Environment, episodeFilter TranscriptEpisodeFilter, options EpisodeOptions) ([]TranscriptEpisode, error) {
-	options = normalizeTranscriptListOptions(options)
-	transcriptVerboseLog(episodeFilter.Verbose, "full list start anchor=%s", episodeFilter.AnchorType)
-	var episodes []TranscriptEpisode
-	if err := eachTranscriptAnchor(ctx, env, episodeFilter, func(session SessionInfo, events []Event, index int, _ AnchorType) error {
-		transcriptVerboseLog(episodeFilter.Verbose, "full episode build session_events=%d", len(events))
-		episode, err := BuildTranscriptEpisodeFromEvents(TranscriptBuildInput{Session: session, Events: events, AnchorIndex: index, Options: options})
-		if err != nil {
-			return err
-		}
-		episodes = append(episodes, episode)
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	transcriptVerboseLog(episodeFilter.Verbose, "full list complete episodes=%d", len(episodes))
-	SortTranscriptEpisodes(episodes)
-	return episodes, nil
+// TranscriptEpisodeAggregate counts lightweight episode metadata without
+// loading any episode evidence payloads.
+type TranscriptEpisodeAggregate struct {
+	Episodes     int            `json:"episodes"`
+	Sessions     int            `json:"sessions"`
+	TaskLineages int            `json:"task_lineages"`
+	Projects     int            `json:"projects"`
+	ByTrigger    map[string]int `json:"by_trigger"`
+	ByStatus     map[string]int `json:"by_status"`
 }
 
 // ListTranscriptEpisodeSummaries lists matching anchors without constructing
@@ -123,6 +106,54 @@ func ListTranscriptEpisodeSummaries(ctx context.Context, env Environment, episod
 	transcriptVerboseLog(episodeFilter.Verbose, "summary list complete summaries=%d", len(summaries))
 	sortTranscriptEpisodeSummaries(summaries)
 	return summaries, nil
+}
+
+// SummarizeTranscriptEpisodes aggregates the same metadata-only projection as
+// ListTranscriptEpisodeSummaries.
+func SummarizeTranscriptEpisodes(ctx context.Context, env Environment, episodeFilter TranscriptEpisodeFilter) (TranscriptEpisodeAggregate, error) {
+	summaries, err := ListTranscriptEpisodeSummaries(ctx, env, episodeFilter)
+	if err != nil {
+		return TranscriptEpisodeAggregate{}, err
+	}
+	return SummarizeTranscriptEpisodeMetadata(summaries), nil
+}
+
+// SummarizeTranscriptEpisodeMetadata counts unique episode IDs and independent
+// session, lineage, and project identifiers.
+func SummarizeTranscriptEpisodeMetadata(summaries []TranscriptEpisodeSummary) TranscriptEpisodeAggregate {
+	result := TranscriptEpisodeAggregate{
+		ByTrigger: map[string]int{},
+		ByStatus:  map[string]int{},
+	}
+	episodes := map[string]struct{}{}
+	sessions := map[string]struct{}{}
+	lineages := map[string]struct{}{}
+	projects := map[string]struct{}{}
+	for _, summary := range summaries {
+		if summary.EpisodeID == "" {
+			continue
+		}
+		if _, ok := episodes[summary.EpisodeID]; ok {
+			continue
+		}
+		episodes[summary.EpisodeID] = struct{}{}
+		if summary.TranscriptID != "" {
+			sessions[summary.TranscriptID] = struct{}{}
+		}
+		if summary.TaskLineageID != "" {
+			lineages[summary.TaskLineageID] = struct{}{}
+		}
+		if summary.ProjectID != "" {
+			projects[summary.ProjectID] = struct{}{}
+		}
+		result.ByTrigger[summary.Trigger.Type]++
+		result.ByStatus[summary.TaskStatus]++
+	}
+	result.Episodes = len(episodes)
+	result.Sessions = len(sessions)
+	result.TaskLineages = len(lineages)
+	result.Projects = len(projects)
+	return result
 }
 
 func listTranscriptCandidateEvents(ctx context.Context, env Environment, sessions []SessionInfo, filter Filter, verbose bool) (map[int64][]Event, int, error) {
@@ -196,39 +227,6 @@ func listTranscriptCandidateEvents(ctx context.Context, env Environment, session
 	return candidates, candidateCount, nil
 }
 
-func eachTranscriptAnchor(ctx context.Context, env Environment, episodeFilter TranscriptEpisodeFilter, visit func(SessionInfo, []Event, int, AnchorType) error) error {
-	filter := episodeFilter.Filter
-	filter.IncludeSubagents = true
-	sessions, err := listAllSessions(ctx, env, filter)
-	if err != nil {
-		return err
-	}
-	transcriptVerboseLog(episodeFilter.Verbose, "full list sessions complete count=%d", len(sessions))
-	for sessionIndex, session := range sessions {
-		if episodeFilter.Verbose && (sessionIndex == 0 || (sessionIndex+1)%10 == 0) {
-			transcriptVerboseLog(true, "loading full session=%d/%d", sessionIndex+1, len(sessions))
-		}
-		detail, err := ShowSession(ctx, env, session.SessionUID)
-		if err != nil {
-			return err
-		}
-		events := canonicalEvents(detail.Events)
-		transcriptVerboseLog(episodeFilter.Verbose, "loaded full session=%d events=%d", sessionIndex+1, len(events))
-		for index, anchorType := range EpisodeAnchorTypes(events) {
-			if anchorType == "" || (episodeFilter.AnchorType != "" && anchorType != episodeFilter.AnchorType) {
-				continue
-			}
-			if !episodeTriggerInRange(events[index].Timestamp, filter.From, filter.To) {
-				continue
-			}
-			if err := visit(session, events, index, anchorType); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 func transcriptVerboseLog(enabled bool, format string, args ...any) {
 	if !enabled {
 		return
@@ -256,15 +254,6 @@ func episodeTriggerInRange(timestamp string, from, to time.Time) bool {
 		return false
 	}
 	return true
-}
-
-func normalizeTranscriptListOptions(options EpisodeOptions) EpisodeOptions {
-	if options.Before == 0 && options.After == 0 && options.ByteBudget == 0 && options.TokenBudget == 0 {
-		options.Before = 3
-		options.After = 8
-		options.ByteBudget = 64 * 1024
-	}
-	return options
 }
 
 func sortTranscriptEpisodeSummaries(summaries []TranscriptEpisodeSummary) {

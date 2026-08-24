@@ -38,12 +38,12 @@ func TestRunCreatesAnIsolatedSyncedSQLiteDatabase(t *testing.T) {
 		t.Fatalf("fixture state mode = %o, want 700", info.Mode().Perm())
 	}
 	env := shokasession.Environment{Home: result.Corpus.Home, StateDir: result.Corpus.StateDir}
-	episodes, err := shokasession.BuildTranscriptEpisodes(context.Background(), env, shokasession.Filter{Agent: shokasession.AgentCodex}, shokasession.EpisodeOptions{})
+	summary, err := shokasession.SummarizeTranscriptEpisodes(context.Background(), env, shokasession.TranscriptEpisodeFilter{Filter: shokasession.Filter{Agent: shokasession.AgentCodex}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(episodes) != 69 {
-		t.Fatalf("episodes = %d, want 69", len(episodes))
+	if summary.Episodes != 69 {
+		t.Fatalf("episodes = %d, want 69", summary.Episodes)
 	}
 }
 

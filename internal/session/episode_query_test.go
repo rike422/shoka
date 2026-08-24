@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -12,31 +11,31 @@ import (
 	"github.com/rike422/shoka/internal/sessionfixture"
 )
 
-func TestListTranscriptEpisodesFiltersAnchorTypeAndTriggerDate(t *testing.T) {
+func TestListTranscriptEpisodeSummariesFiltersAnchorTypeAndTriggerDate(t *testing.T) {
 	env := syncCodexDesignFixture(t)
 	from := time.Date(2026, 8, 20, 1, 0, 6, 0, time.UTC)
 	to := from
-	episodes, err := ListTranscriptEpisodes(context.Background(), env, TranscriptEpisodeFilter{
+	summaries, err := ListTranscriptEpisodeSummaries(context.Background(), env, TranscriptEpisodeFilter{
 		Filter:     Filter{Agent: AgentCodex, From: from, To: to},
 		AnchorType: AnchorDesignDirection,
-	}, EpisodeOptions{})
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(episodes) != 1 {
-		t.Fatalf("episodes = %+v", episodes)
+	if len(summaries) != 1 {
+		t.Fatalf("summaries = %+v", summaries)
 	}
-	if episodes[0].Trigger.Type != string(AnchorDesignDirection) {
-		t.Fatalf("trigger type = %q", episodes[0].Trigger.Type)
+	if summaries[0].Trigger.Type != string(AnchorDesignDirection) {
+		t.Fatalf("trigger type = %q", summaries[0].Trigger.Type)
 	}
-	if episodes[0].Trigger.Timestamp != "2026-08-20T01:00:06Z" {
-		t.Fatalf("trigger timestamp = %q", episodes[0].Trigger.Timestamp)
+	if summaries[0].Trigger.Timestamp != "2026-08-20T01:00:06Z" {
+		t.Fatalf("trigger timestamp = %q", summaries[0].Trigger.Timestamp)
 	}
 
-	outside, err := ListTranscriptEpisodes(context.Background(), env, TranscriptEpisodeFilter{
+	outside, err := ListTranscriptEpisodeSummaries(context.Background(), env, TranscriptEpisodeFilter{
 		Filter:     Filter{Agent: AgentCodex, From: from.Add(time.Second), To: to.Add(time.Second)},
 		AnchorType: AnchorDesignDirection,
-	}, EpisodeOptions{})
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +62,7 @@ func TestListTranscriptEpisodeSummaries(t *testing.T) {
 	}
 }
 
-func TestTranscriptEpisodeEnumerationIsNotCappedByInteractiveTopK(t *testing.T) {
+func TestTranscriptEpisodeSummaryEnumerationIsNotCappedByInteractiveTopK(t *testing.T) {
 	env := syncEpisodeCorpus(t, 64)
 	from := time.Date(2026, 8, 20, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 8, 20, 23, 59, 59, 0, time.UTC)
@@ -72,19 +71,12 @@ func TestTranscriptEpisodeEnumerationIsNotCappedByInteractiveTopK(t *testing.T) 
 		AnchorType: AnchorDesignDirection,
 	}
 
-	episodes, err := ListTranscriptEpisodes(context.Background(), env, filter, EpisodeOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
 	summaries, err := ListTranscriptEpisodeSummaries(context.Background(), env, filter)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(episodes) != 64 || len(summaries) != 64 {
-		t.Fatalf("episode enumeration was capped: full=%d summaries=%d", len(episodes), len(summaries))
-	}
-	if got, want := summaryEpisodeIDs(summaries), transcriptEpisodeIDs(episodes); !equalStrings(got, want) {
-		t.Fatalf("summary/full episode ids differ:\nsummary=%v\nfull=%v", got, want)
+	if len(summaries) != 64 {
+		t.Fatalf("episode enumeration was capped: summaries=%d", len(summaries))
 	}
 }
 
@@ -97,19 +89,12 @@ func TestTranscriptEpisodeSummaryRetainsHistoryBeforeFilterWindowForClassificati
 		AnchorType: AnchorRequirementRestatement,
 	}
 
-	episodes, err := ListTranscriptEpisodes(context.Background(), env, filter, EpisodeOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
 	summaries, err := ListTranscriptEpisodeSummaries(context.Background(), env, filter)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(episodes) != 1 || len(summaries) != 1 {
-		t.Fatalf("window boundary classification differs: full=%d summaries=%d", len(episodes), len(summaries))
-	}
-	if summaries[0].EpisodeID != episodes[0].EpisodeID {
-		t.Fatalf("boundary episode id differs: summary=%q full=%q", summaries[0].EpisodeID, episodes[0].EpisodeID)
+	if len(summaries) != 1 {
+		t.Fatalf("window boundary classification failed: summaries=%d", len(summaries))
 	}
 }
 
@@ -120,20 +105,13 @@ func TestEpisodeCorpusProvidesAllAnchorTypesWithSummaryParity(t *testing.T) {
 		From:  time.Date(2026, 8, 20, 0, 0, 0, 0, time.UTC),
 		To:    time.Date(2026, 8, 20, 23, 59, 59, 0, time.UTC),
 	}}
-	episodes, err := ListTranscriptEpisodes(context.Background(), env, filter, EpisodeOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
 	summaries, err := ListTranscriptEpisodeSummaries(context.Background(), env, filter)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := summaryEpisodeIDs(summaries), transcriptEpisodeIDs(episodes); !equalStrings(got, want) {
-		t.Fatalf("summary/full episode ids differ:\nsummary=%v\nfull=%v", got, want)
-	}
 	counts := make(map[string]int)
-	for _, episode := range episodes {
-		counts[episode.Trigger.Type]++
+	for _, summary := range summaries {
+		counts[summary.Trigger.Type]++
 	}
 	want := map[string]int{
 		string(AnchorDesignDirection):        64,
@@ -150,14 +128,49 @@ func TestEpisodeCorpusProvidesAllAnchorTypesWithSummaryParity(t *testing.T) {
 	}
 }
 
-func TestNormalizeTranscriptListOptionsBoundsUnspecifiedContext(t *testing.T) {
-	got := normalizeTranscriptListOptions(EpisodeOptions{})
-	if got.Before != 3 || got.After != 8 || got.ByteBudget != 64*1024 || got.TokenBudget != 0 {
-		t.Fatalf("default list options = %+v", got)
+func TestSummarizeTranscriptEpisodesCountsIndependentMetadata(t *testing.T) {
+	env := syncEpisodeCorpus(t, 64)
+	filter := TranscriptEpisodeFilter{Filter: Filter{
+		Agent: AgentCodex,
+		From:  time.Date(2026, 8, 20, 0, 0, 0, 0, time.UTC),
+		To:    time.Date(2026, 8, 20, 23, 59, 59, 0, time.UTC),
+	}}
+
+	summary, err := SummarizeTranscriptEpisodes(context.Background(), env, filter)
+	if err != nil {
+		t.Fatal(err)
 	}
-	explicit := EpisodeOptions{Before: 1, After: 2}
-	if got := normalizeTranscriptListOptions(explicit); got != explicit {
-		t.Fatalf("explicit list options changed: got=%+v want=%+v", got, explicit)
+	if summary.Episodes != 69 || summary.Sessions != 64 || summary.TaskLineages != 64 || summary.Projects != 4 {
+		t.Fatalf("unexpected independent counts: %+v", summary)
+	}
+	wantTriggers := map[string]int{
+		string(AnchorDesignDirection):        64,
+		string(AnchorRequirementRestatement): 1,
+		string(AnchorUserCorrection):         1,
+		string(AnchorScopeRevision):          1,
+		string(AnchorTestFailure):            1,
+		string(AnchorError):                  1,
+	}
+	if !equalStringInts(summary.ByTrigger, wantTriggers) {
+		t.Fatalf("trigger counts = %v, want %v", summary.ByTrigger, wantTriggers)
+	}
+	if !equalStringInts(summary.ByStatus, map[string]int{"complete": 69}) {
+		t.Fatalf("status counts = %v", summary.ByStatus)
+	}
+}
+
+func TestSummarizeTranscriptEpisodeMetadataDeduplicatesEpisodeIDs(t *testing.T) {
+	item := TranscriptEpisodeSummary{
+		EpisodeID:     "episode-1",
+		TranscriptID:  "session-1",
+		TaskLineageID: "lineage-1",
+		ProjectID:     "project-1",
+		Trigger:       TranscriptTrigger{Type: string(AnchorError)},
+		TaskStatus:    "failed",
+	}
+	summary := SummarizeTranscriptEpisodeMetadata([]TranscriptEpisodeSummary{item, item})
+	if summary.Episodes != 1 || summary.Sessions != 1 || summary.ByTrigger[string(AnchorError)] != 1 {
+		t.Fatalf("duplicate episode was counted: %+v", summary)
 	}
 }
 
@@ -183,19 +196,19 @@ func TestSearchTranscriptEpisodesReturnsEvidenceCountsAndReason(t *testing.T) {
 
 func TestBuildAndWriteTranscriptEpisode(t *testing.T) {
 	env := syncCodexFixture(t)
-	episodes, err := BuildTranscriptEpisodes(context.Background(), env, Filter{Agent: AgentCodex}, EpisodeOptions{Before: 1, After: 2})
+	summaries, err := ListTranscriptEpisodeSummaries(context.Background(), env, TranscriptEpisodeFilter{Filter: Filter{Agent: AgentCodex}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(episodes) == 0 {
+	if len(summaries) == 0 {
 		t.Fatal("no episode was built")
 	}
-	found, err := BuildTranscriptEpisode(context.Background(), env, episodes[0].EpisodeID, EpisodeOptions{Before: 0, After: 1})
+	found, err := BuildTranscriptEpisode(context.Background(), env, summaries[0].EpisodeID, EpisodeOptions{Before: 0, After: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if found.EpisodeID != episodes[0].EpisodeID {
-		t.Fatalf("episode id changed: %q != %q", found.EpisodeID, episodes[0].EpisodeID)
+	if found.EpisodeID != summaries[0].EpisodeID {
+		t.Fatalf("episode id changed: %q != %q", found.EpisodeID, summaries[0].EpisodeID)
 	}
 	output := t.TempDir() + "/episode.json"
 	if err := WriteTranscriptEpisodeEvidence(context.Background(), env, found.EpisodeID, output, EpisodeOptions{Before: 0, After: 1}); err != nil {
@@ -233,30 +246,12 @@ func syncEpisodeCorpus(t *testing.T, count int) Environment {
 	return env
 }
 
-func transcriptEpisodeIDs(episodes []TranscriptEpisode) []string {
-	ids := make([]string, 0, len(episodes))
-	for _, episode := range episodes {
-		ids = append(ids, episode.EpisodeID)
-	}
-	sort.Strings(ids)
-	return ids
-}
-
-func summaryEpisodeIDs(summaries []TranscriptEpisodeSummary) []string {
-	ids := make([]string, 0, len(summaries))
-	for _, summary := range summaries {
-		ids = append(ids, summary.EpisodeID)
-	}
-	sort.Strings(ids)
-	return ids
-}
-
-func equalStrings(left, right []string) bool {
+func equalStringInts(left, right map[string]int) bool {
 	if len(left) != len(right) {
 		return false
 	}
-	for index := range left {
-		if left[index] != right[index] {
+	for key, value := range left {
+		if right[key] != value {
 			return false
 		}
 	}
