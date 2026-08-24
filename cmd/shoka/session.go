@@ -58,8 +58,12 @@ func cmdTranscript(args []string) error {
 }
 
 func cmdTranscriptEpisodeList(args []string) error {
+	if hasCLIFlag(args, "--verbose") {
+		fmt.Fprintf(os.Stderr, "[transcript verbose] episode list entry args_count=%d\n", len(args))
+	}
 	spec := filterOptionSpec(false)
 	addEpisodeOptionSpec(spec)
+	spec["--verbose"] = false
 	parsed, err := parseCommandOptions(args, spec)
 	if err != nil {
 		return err
@@ -71,6 +75,8 @@ func cmdTranscriptEpisodeList(args []string) error {
 	if err != nil {
 		return err
 	}
+	filter = applyDefaultTranscriptEpisodeListRange(filter, parsed, time.Now().UTC())
+	filter.Verbose = parsed.booleans["--verbose"]
 	options, err := episodeOptionsFromParsed(parsed)
 	if err != nil {
 		return err
@@ -79,17 +85,29 @@ func cmdTranscriptEpisodeList(args []string) error {
 	if err != nil {
 		return err
 	}
-	episodes, err := shokasession.ListTranscriptEpisodes(context.Background(), env, filter, options)
+	if parsed.booleans["--json"] {
+		episodes, err := shokasession.ListTranscriptEpisodes(context.Background(), env, filter, options)
+		if err != nil {
+			return err
+		}
+		return encodeJSON(episodes)
+	}
+	summaries, err := shokasession.ListTranscriptEpisodeSummaries(context.Background(), env, filter)
 	if err != nil {
 		return err
 	}
-	if parsed.booleans["--json"] {
-		return encodeJSON(episodes)
-	}
-	for _, episode := range episodes {
-		fmt.Printf("%s  %s  trigger=%s event=%d status=%s\n", episode.Trigger.Timestamp, episode.EpisodeID, episode.Trigger.Type, episode.Trigger.EventID, episode.TaskStatus)
+	for _, summary := range summaries {
+		fmt.Printf("%s  %s  trigger=%s event=%d status=%s\n", summary.Trigger.Timestamp, summary.EpisodeID, summary.Trigger.Type, summary.Trigger.EventID, summary.TaskStatus)
 	}
 	return nil
+}
+
+func applyDefaultTranscriptEpisodeListRange(filter shokasession.TranscriptEpisodeFilter, parsed parsedOptions, now time.Time) shokasession.TranscriptEpisodeFilter {
+	if parsed.values["--from"] == "" && parsed.values["--to"] == "" {
+		filter.Filter.From = now.Add(-7 * 24 * time.Hour)
+		filter.Filter.To = now
+	}
+	return filter
 }
 
 func transcriptEpisodeFilterFromOptions(parsed parsedOptions) (shokasession.TranscriptEpisodeFilter, error) {

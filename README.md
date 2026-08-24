@@ -184,7 +184,11 @@ bounded to 1 MiB and records deterministic omission counts.
 `transcript episode list` is the queryless enumeration path for downstream
 analysis. Its `--event-type` selects an observable episode trigger such as
 `design_direction` or `scope_revision`; `--from` and `--to` filter the trigger
-timestamp, not merely the enclosing session lifetime.
+timestamp, not merely the enclosing session lifetime. When neither date is
+specified, list defaults to the previous seven days. Plain-text output uses a
+metadata-only path; JSON output includes bounded context by default. Add
+`--verbose` to print progress and memory diagnostics to stderr without
+printing transcript content.
 
 `transcript episode search` and `transcript episode export` use the separate
 [`transcript-episode/v1`](docs/transcript-episode-v1.schema.json) contract. Episodes

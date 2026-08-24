@@ -7,7 +7,25 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	shokasession "github.com/rike422/shoka/internal/session"
 )
+
+func TestDefaultTranscriptEpisodeListRange(t *testing.T) {
+	now := time.Date(2026, 8, 23, 12, 0, 0, 0, time.UTC)
+	parsed := parsedOptions{values: map[string]string{}, booleans: map[string]bool{}}
+	filter := applyDefaultTranscriptEpisodeListRange(shokasession.TranscriptEpisodeFilter{}, parsed, now)
+	if !filter.Filter.From.Equal(now.Add(-7*24*time.Hour)) || !filter.Filter.To.Equal(now) {
+		t.Fatalf("default range = %s..%s", filter.Filter.From, filter.Filter.To)
+	}
+
+	explicit := parsedOptions{values: map[string]string{"--from": "2026-08-01"}, booleans: map[string]bool{}}
+	filter = applyDefaultTranscriptEpisodeListRange(shokasession.TranscriptEpisodeFilter{Filter: shokasession.Filter{From: now.Add(-30 * 24 * time.Hour)}}, explicit, now)
+	if !filter.Filter.From.Equal(now.Add(-30*24*time.Hour)) || !filter.Filter.To.IsZero() {
+		t.Fatalf("explicit range was overwritten = %s..%s", filter.Filter.From, filter.Filter.To)
+	}
+}
 
 func TestSessionCLIWorkflow(t *testing.T) {
 	home := t.TempDir()
@@ -72,7 +90,7 @@ func TestSessionCLIWorkflow(t *testing.T) {
 		t.Fatalf("unexpected design trigger: %+v", listedEpisodes[0]["trigger"])
 	}
 	plainEpisodeListOutput := captureStdout(t, func() error {
-		return cmdTranscript([]string{"episode", "list", "--agent", "codex", "--event-type", "design_direction"})
+		return cmdTranscript([]string{"episode", "list", "--agent", "codex", "--event-type", "design_direction", "--from", "2026-08-20", "--to", "2026-08-20"})
 	})
 	if !strings.Contains(plainEpisodeListOutput, "2026-08-20T01:00:06Z") || !strings.Contains(plainEpisodeListOutput, "trigger=design_direction") {
 		t.Fatalf("episode list output lacks date or trigger: %s", plainEpisodeListOutput)

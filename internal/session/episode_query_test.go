@@ -42,6 +42,35 @@ func TestListTranscriptEpisodesFiltersAnchorTypeAndTriggerDate(t *testing.T) {
 	}
 }
 
+func TestListTranscriptEpisodeSummaries(t *testing.T) {
+	env := syncCodexDesignFixture(t)
+	from := time.Date(2026, 8, 20, 1, 0, 6, 0, time.UTC)
+	summaries, err := ListTranscriptEpisodeSummaries(context.Background(), env, TranscriptEpisodeFilter{
+		Filter:     Filter{Agent: AgentCodex, From: from, To: from},
+		AnchorType: AnchorDesignDirection,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summaries) != 1 {
+		t.Fatalf("summaries = %+v", summaries)
+	}
+	if summaries[0].EpisodeID == "" || summaries[0].Trigger.Type != string(AnchorDesignDirection) || summaries[0].Trigger.Timestamp != "2026-08-20T01:00:06Z" {
+		t.Fatalf("unexpected summary = %+v", summaries[0])
+	}
+}
+
+func TestNormalizeTranscriptListOptionsBoundsUnspecifiedContext(t *testing.T) {
+	got := normalizeTranscriptListOptions(EpisodeOptions{})
+	if got.Before != 3 || got.After != 8 || got.ByteBudget != 64*1024 || got.TokenBudget != 0 {
+		t.Fatalf("default list options = %+v", got)
+	}
+	explicit := EpisodeOptions{Before: 1, After: 2}
+	if got := normalizeTranscriptListOptions(explicit); got != explicit {
+		t.Fatalf("explicit list options changed: got=%+v want=%+v", got, explicit)
+	}
+}
+
 func TestSearchTranscriptEpisodesReturnsEvidenceCountsAndReason(t *testing.T) {
 	env := syncCodexFixture(t)
 	result, err := SearchTranscriptEpisodes(context.Background(), env, "migration test failed", Filter{Agent: AgentCodex}, EpisodeOptions{Before: 1, After: 2})
