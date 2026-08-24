@@ -38,16 +38,12 @@ type SyncStats struct {
 
 // Sync discovers and transactionally updates selected agent sources.
 func Sync(ctx context.Context, options SyncOptions) (SyncStats, error) {
+	if err := validateMutationEnvironment(options.Environment); err != nil {
+		return SyncStats{}, err
+	}
 	agents := options.Agents
 	if len(agents) == 0 {
 		agents = AllAgents
-	}
-	if options.Environment.Home == "" {
-		env, err := CurrentEnvironment()
-		if err != nil {
-			return SyncStats{}, err
-		}
-		options.Environment = env
 	}
 	if options.DryRun {
 		return syncDryRun(ctx, options.Environment, agents)
@@ -129,12 +125,8 @@ func syncUnlocked(ctx context.Context, options SyncOptions) (SyncStats, error) {
 // sources. Discovery is completed before deletion so an unavailable source
 // layout cannot erase the current index.
 func Reindex(ctx context.Context, env Environment) (SyncStats, error) {
-	if env.Home == "" {
-		current, err := CurrentEnvironment()
-		if err != nil {
-			return SyncStats{}, err
-		}
-		env = current
+	if err := validateMutationEnvironment(env); err != nil {
+		return SyncStats{}, err
 	}
 	release, err := acquireStateLock(env)
 	if err != nil {
@@ -173,6 +165,16 @@ func Reindex(ctx context.Context, env Environment) (SyncStats, error) {
 		return stats, fmt.Errorf("reindex completed with %d source errors; rerun after correcting them", len(stats.Errors))
 	}
 	return stats, nil
+}
+
+func validateMutationEnvironment(env Environment) error {
+	if env.Home == "" {
+		return fmt.Errorf("session environment requires an explicit home directory")
+	}
+	if env.StateDir == "" {
+		return fmt.Errorf("session environment requires an explicit state directory")
+	}
+	return nil
 }
 
 func syncDryRun(ctx context.Context, env Environment, agents []Agent) (SyncStats, error) {

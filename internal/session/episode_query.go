@@ -80,10 +80,7 @@ func ListTranscriptEpisodeSummaries(ctx context.Context, env Environment, episod
 	transcriptVerboseLog(episodeFilter.Verbose, "summary list start anchor=%s", episodeFilter.AnchorType)
 	filter := episodeFilter.Filter
 	filter.IncludeSubagents = true
-	if filter.Limit == 0 {
-		filter.Limit = 1000
-	}
-	sessions, err := ListSessions(ctx, env, filter)
+	sessions, err := listAllSessions(ctx, env, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -136,58 +133,65 @@ func listTranscriptCandidateEvents(ctx context.Context, env Environment, session
 	}
 	defer func() { _ = store.Close() }()
 
-	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(sessions)), ",")
-	query := `
-		SELECT e.session_id,e.id,e.ts,e.role,e.kind,c.text
-		FROM events e
-		JOIN event_contents c ON c.id=e.content_id
-		WHERE e.session_id IN (` + placeholders + `)
-		  AND e.duplicate_of IS NULL
-		  AND (
-		    e.kind IN (?, ?, ?, ?)
-		    OR (e.role=? AND e.kind=?)
-		  )`
-	args := make([]any, 0, len(sessions)+8)
-	for _, session := range sessions {
-		args = append(args, session.ID)
-	}
-	args = append(args, KindError, KindTestFailure, KindUserCorrection, KindStatus, RoleUser, KindMessage)
-	if !filter.From.IsZero() {
-		query += ` AND e.ts>=?`
-		args = append(args, filter.From.UTC().UnixMilli())
-	}
-	if !filter.To.IsZero() {
-		query += ` AND e.ts<=?`
-		args = append(args, filter.To.UTC().UnixMilli())
-	}
-	if filter.File != "" {
-		query += ` AND EXISTS(SELECT 1 FROM event_files f WHERE f.content_id=e.content_id AND f.path=?)`
-		args = append(args, filter.File)
-	}
-	query += ` ORDER BY e.session_id,e.ts,e.source_id,e.record_ordinal,e.part_ordinal,e.id`
-	rows, err := store.db.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, 0, fmt.Errorf("list transcript episode summaries: %w", err)
-	}
-	defer rows.Close()
 	candidates := make(map[int64][]Event, len(sessions))
 	candidateCount := 0
-	for rows.Next() {
-		var sessionID int64
-		var event Event
-		var timestamp int64
-		if err := rows.Scan(&sessionID, &event.ID, &timestamp, &event.Role, &event.Kind, &event.Text); err != nil {
+	const sessionBatchSize = 500
+	for start := 0; start < len(sessions); start += sessionBatchSize {
+		end := start + sessionBatchSize
+		if end > len(sessions) {
+			end = len(sessions)
+		}
+		batch := sessions[start:end]
+		placeholders := strings.TrimSuffix(strings.Repeat("?,", len(batch)), ",")
+		query := `
+			SELECT e.session_id,e.id,e.ts,e.role,e.kind,c.text
+			FROM events e
+			JOIN event_contents c ON c.id=e.content_id
+			WHERE e.session_id IN (` + placeholders + `)
+			  AND e.duplicate_of IS NULL
+			  AND (
+			    e.kind IN (?, ?, ?, ?)
+			    OR (e.role=? AND e.kind=?)
+			  )`
+		args := make([]any, 0, len(batch)+7)
+		for _, session := range batch {
+			args = append(args, session.ID)
+		}
+		args = append(args, KindError, KindTestFailure, KindUserCorrection, KindStatus, RoleUser, KindMessage)
+		// Classification of a requirement restatement needs user messages from
+		// before the output window. The lower bound is therefore applied only
+		// after EpisodeAnchorTypes has seen the preceding session history.
+		if !filter.To.IsZero() {
+			query += ` AND e.ts<=?`
+			args = append(args, filter.To.UTC().UnixMilli())
+		}
+		query += ` ORDER BY e.session_id,e.ts,e.source_id,e.record_ordinal,e.part_ordinal,e.id`
+		rows, err := store.db.QueryContext(ctx, query, args...)
+		if err != nil {
+			return nil, 0, fmt.Errorf("list transcript episode summaries: %w", err)
+		}
+		for rows.Next() {
+			var sessionID int64
+			var event Event
+			var timestamp int64
+			if err := rows.Scan(&sessionID, &event.ID, &timestamp, &event.Role, &event.Kind, &event.Text); err != nil {
+				_ = rows.Close()
+				return nil, 0, err
+			}
+			event.Timestamp = formatMillis(timestamp)
+			candidates[sessionID] = append(candidates[sessionID], event)
+			candidateCount++
+			if verbose && candidateCount%1000 == 0 {
+				transcriptVerboseLog(true, "candidate rows scanned=%d", candidateCount)
+			}
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
 			return nil, 0, err
 		}
-		event.Timestamp = formatMillis(timestamp)
-		candidates[sessionID] = append(candidates[sessionID], event)
-		candidateCount++
-		if verbose && candidateCount%1000 == 0 {
-			transcriptVerboseLog(true, "candidate rows scanned=%d", candidateCount)
+		if err := rows.Close(); err != nil {
+			return nil, 0, err
 		}
-	}
-	if err := rows.Err(); err != nil {
-		return nil, 0, err
 	}
 	return candidates, candidateCount, nil
 }
@@ -195,10 +199,7 @@ func listTranscriptCandidateEvents(ctx context.Context, env Environment, session
 func eachTranscriptAnchor(ctx context.Context, env Environment, episodeFilter TranscriptEpisodeFilter, visit func(SessionInfo, []Event, int, AnchorType) error) error {
 	filter := episodeFilter.Filter
 	filter.IncludeSubagents = true
-	if filter.Limit == 0 {
-		filter.Limit = 1000
-	}
-	sessions, err := ListSessions(ctx, env, filter)
+	sessions, err := listAllSessions(ctx, env, filter)
 	if err != nil {
 		return err
 	}

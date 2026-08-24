@@ -139,6 +139,16 @@ func openExistingStore(env Environment) (*Store, error) {
 
 // ListSessions lists session metadata, hiding subagents by default.
 func ListSessions(ctx context.Context, env Environment, filter Filter) ([]SessionInfo, error) {
+	return listSessions(ctx, env, filter, normalizedLimit(filter.Limit, 100))
+}
+
+// listAllSessions applies the same metadata contract as ListSessions without
+// the interactive TopK cap. It is reserved for complete local enumeration.
+func listAllSessions(ctx context.Context, env Environment, filter Filter) ([]SessionInfo, error) {
+	return listSessions(ctx, env, filter, 0)
+}
+
+func listSessions(ctx context.Context, env Environment, filter Filter, limit int) ([]SessionInfo, error) {
 	filter = normalizeFilter(filter)
 	store, err := openExistingStore(env)
 	if err != nil {
@@ -189,8 +199,11 @@ func ListSessions(ctx context.Context, env Environment, filter Filter) ([]Sessio
 		query += ` AND s.started_at<=?`
 		args = append(args, filter.To.UTC().UnixMilli())
 	}
-	query += ` ORDER BY s.ended_at DESC,s.session_uid ASC LIMIT ?`
-	args = append(args, normalizedLimit(filter.Limit, 100))
+	query += ` ORDER BY s.ended_at DESC,s.session_uid ASC`
+	if limit > 0 {
+		query += ` LIMIT ?`
+		args = append(args, limit)
+	}
 	rows, err := store.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err

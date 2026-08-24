@@ -8,3 +8,4 @@ dist/
 
 # Machine-only bench artifacts (private corpora, raw logs)
 /local/
+/.tmp/

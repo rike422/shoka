@@ -11,18 +11,27 @@ import (
 const stateDBName = "sessions.db"
 const stateLockName = "sessions.lock"
 
-// ResolveStateDir locates user-private Shoka state.
+// ResolveStateDir returns the explicitly selected Shoka state directory.
 func ResolveStateDir(env Environment) (string, error) {
-	if value, ok := env.lookup("SHOKA_STATE_DIR"); ok && value != "" {
-		return filepath.Abs(value)
+	if env.StateDir == "" {
+		return "", fmt.Errorf("session environment requires an explicit state directory")
 	}
-	if value, ok := env.lookup("XDG_STATE_HOME"); ok && value != "" {
-		return filepath.Abs(filepath.Join(value, "shoka"))
+	return filepath.Abs(env.StateDir)
+}
+
+func resolveConfiguredStateDir(home string, lookup func(string) (string, bool)) (string, error) {
+	if lookup != nil {
+		if value, ok := lookup("SHOKA_STATE_DIR"); ok && value != "" {
+			return filepath.Abs(value)
+		}
+		if value, ok := lookup("XDG_STATE_HOME"); ok && value != "" {
+			return filepath.Abs(filepath.Join(value, "shoka"))
+		}
 	}
-	if env.Home == "" {
+	if home == "" {
 		return "", fmt.Errorf("cannot resolve state directory without a home directory")
 	}
-	return filepath.Abs(filepath.Join(env.Home, ".local", "state", "shoka"))
+	return filepath.Abs(filepath.Join(home, ".local", "state", "shoka"))
 }
 
 // EnsureStateDir creates or tightens a private state directory.

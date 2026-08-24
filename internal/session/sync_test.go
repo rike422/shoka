@@ -14,7 +14,7 @@ import (
 
 func TestSyncIsIdempotentAndHandlesAppendRebuildMissing(t *testing.T) {
 	home := t.TempDir()
-	env := Environment{Home: home, LookupEnv: mapLookup(nil)}
+	env := testEnvironment(home)
 	logPath := filepath.Join(home, ".codex", "sessions", "2026", "08", "20", "sync-session.jsonl")
 	completePrefix := strings.Join([]string{
 		`{"timestamp":"2026-08-20T01:00:00Z","type":"session_meta","payload":{"id":"sync-session","cwd":"` + home + `","timestamp":"2026-08-20T01:00:00Z"}}`,
@@ -203,7 +203,7 @@ func TestSyncIsIdempotentAndHandlesAppendRebuildMissing(t *testing.T) {
 
 func TestSyncPersistsOnlyPrivateRedactedText(t *testing.T) {
 	home := t.TempDir()
-	env := Environment{Home: home, LookupEnv: mapLookup(nil)}
+	env := testEnvironment(home)
 	data, err := os.ReadFile(filepath.Join("testdata", "codex.jsonl"))
 	if err != nil {
 		t.Fatal(err)
@@ -241,7 +241,7 @@ func TestSyncPersistsOnlyPrivateRedactedText(t *testing.T) {
 
 func TestSyncDryRunDoesNotCreateState(t *testing.T) {
 	home := t.TempDir()
-	env := Environment{Home: home, LookupEnv: mapLookup(nil)}
+	env := testEnvironment(home)
 	data, err := os.ReadFile(filepath.Join("testdata", "pi.jsonl"))
 	if err != nil {
 		t.Fatal(err)
@@ -265,7 +265,7 @@ func TestSyncDryRunDoesNotCreateState(t *testing.T) {
 
 func TestSyncRebuildsChangedOpenCodePart(t *testing.T) {
 	home := t.TempDir()
-	env := Environment{Home: home, LookupEnv: mapLookup(nil)}
+	env := testEnvironment(home)
 	dbPath := filepath.Join(home, ".local", "share", "opencode", "opencode.db")
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0o700); err != nil {
 		t.Fatal(err)
@@ -336,7 +336,7 @@ func TestSyncRebuildsChangedOpenCodePart(t *testing.T) {
 
 func TestReindexDeletesDerivedStateAndRebuildsFromRawSources(t *testing.T) {
 	home := t.TempDir()
-	env := Environment{Home: home, LookupEnv: mapLookup(nil)}
+	env := testEnvironment(home)
 	logPath := filepath.Join(home, ".codex", "sessions", "reindex.jsonl")
 	writeFixture(t, logPath, []byte(strings.Join([]string{
 		`{"timestamp":"2026-08-20T01:00:00Z","type":"session_meta","payload":{"id":"reindex-session","cwd":"/tmp/example"}}`,
@@ -385,7 +385,7 @@ func TestReindexDeletesDerivedStateAndRebuildsFromRawSources(t *testing.T) {
 
 func TestReindexPreflightFailurePreservesExistingDatabase(t *testing.T) {
 	home := t.TempDir()
-	env := Environment{Home: home, LookupEnv: mapLookup(nil)}
+	env := testEnvironment(home)
 	store, err := OpenStore(env)
 	if err != nil {
 		t.Fatal(err)
@@ -411,8 +411,34 @@ func TestReindexPreflightFailurePreservesExistingDatabase(t *testing.T) {
 	}
 }
 
-func TestStateLockExcludesConcurrentMutation(t *testing.T) {
+func TestSyncRequiresExplicitStateDirectory(t *testing.T) {
 	env := Environment{Home: t.TempDir(), LookupEnv: mapLookup(nil)}
+	_, err := Sync(context.Background(), SyncOptions{Environment: env, Agents: []Agent{AgentCodex}})
+	if err == nil || !strings.Contains(err.Error(), "state directory") {
+		t.Fatalf("sync accepted an implicit state directory: %v", err)
+	}
+}
+
+func TestReindexRequiresExplicitStateDirectory(t *testing.T) {
+	env := Environment{Home: t.TempDir(), LookupEnv: mapLookup(nil)}
+	_, err := Reindex(context.Background(), env)
+	if err == nil || !strings.Contains(err.Error(), "state directory") {
+		t.Fatalf("reindex accepted an implicit state directory: %v", err)
+	}
+}
+
+func TestMutationsRequireExplicitHomeDirectory(t *testing.T) {
+	env := Environment{StateDir: t.TempDir(), LookupEnv: mapLookup(nil)}
+	if _, err := Sync(context.Background(), SyncOptions{Environment: env, Agents: []Agent{AgentCodex}}); err == nil || !strings.Contains(err.Error(), "home directory") {
+		t.Fatalf("sync accepted an implicit home directory: %v", err)
+	}
+	if _, err := Reindex(context.Background(), env); err == nil || !strings.Contains(err.Error(), "home directory") {
+		t.Fatalf("reindex accepted an implicit home directory: %v", err)
+	}
+}
+
+func TestStateLockExcludesConcurrentMutation(t *testing.T) {
+	env := Environment{Home: t.TempDir(), StateDir: t.TempDir(), LookupEnv: mapLookup(nil)}
 	release, err := acquireStateLock(env)
 	if err != nil {
 		t.Fatal(err)

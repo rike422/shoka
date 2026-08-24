@@ -39,9 +39,10 @@ const (
 	SourceSQLiteLogical SourceKind = "sqlite_logical"
 )
 
-// Environment makes discovery deterministic and testable.
+// Environment explicitly identifies the raw session inputs and derived state.
 type Environment struct {
 	Home      string
+	StateDir  string
 	LookupEnv func(string) (string, bool)
 }
 
@@ -51,7 +52,11 @@ func CurrentEnvironment() (Environment, error) {
 	if err != nil {
 		return Environment{}, err
 	}
-	return Environment{Home: home, LookupEnv: os.LookupEnv}, nil
+	stateDir, err := resolveConfiguredStateDir(home, os.LookupEnv)
+	if err != nil {
+		return Environment{}, err
+	}
+	return Environment{Home: home, StateDir: stateDir, LookupEnv: os.LookupEnv}, nil
 }
 
 func (e Environment) lookup(key string) (string, bool) {

@@ -94,7 +94,7 @@ func TestListShowSearchAndFilters(t *testing.T) {
 
 func TestSubagentsAreHiddenByDefault(t *testing.T) {
 	home := t.TempDir()
-	env := Environment{Home: home, LookupEnv: mapLookup(nil)}
+	env := testEnvironment(home)
 	rootDir := filepath.Join(home, ".cursor", "projects", "tmp", "agent-transcripts", "root-session")
 	writeFixture(t, filepath.Join(rootDir, "root-session.jsonl"), []byte(`{"role":"user","message":{"content":[{"type":"text","text":"root task"}]}}`+"\n"))
 	writeFixture(t, filepath.Join(rootDir, "subagents", "child-session.jsonl"), []byte(`{"role":"assistant","message":{"content":[{"type":"text","text":"child evidence"}]}}`+"\n"))
@@ -226,7 +226,7 @@ func TestTranscriptEpisodeSchemaDocumentMatchesProducerVersion(t *testing.T) {
 func syncCodexFixture(t *testing.T) Environment {
 	t.Helper()
 	home := t.TempDir()
-	env := Environment{Home: home, LookupEnv: mapLookup(nil)}
+	env := testEnvironment(home)
 	data, err := os.ReadFile(filepath.Join("testdata", "codex.jsonl"))
 	if err != nil {
 		t.Fatal(err)

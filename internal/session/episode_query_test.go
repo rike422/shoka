@@ -4,9 +4,12 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/rike422/shoka/internal/sessionfixture"
 )
 
 func TestListTranscriptEpisodesFiltersAnchorTypeAndTriggerDate(t *testing.T) {
@@ -57,6 +60,93 @@ func TestListTranscriptEpisodeSummaries(t *testing.T) {
 	}
 	if summaries[0].EpisodeID == "" || summaries[0].Trigger.Type != string(AnchorDesignDirection) || summaries[0].Trigger.Timestamp != "2026-08-20T01:00:06Z" {
 		t.Fatalf("unexpected summary = %+v", summaries[0])
+	}
+}
+
+func TestTranscriptEpisodeEnumerationIsNotCappedByInteractiveTopK(t *testing.T) {
+	env := syncEpisodeCorpus(t, 64)
+	from := time.Date(2026, 8, 20, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 8, 20, 23, 59, 59, 0, time.UTC)
+	filter := TranscriptEpisodeFilter{
+		Filter:     Filter{Agent: AgentCodex, From: from, To: to},
+		AnchorType: AnchorDesignDirection,
+	}
+
+	episodes, err := ListTranscriptEpisodes(context.Background(), env, filter, EpisodeOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	summaries, err := ListTranscriptEpisodeSummaries(context.Background(), env, filter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(episodes) != 64 || len(summaries) != 64 {
+		t.Fatalf("episode enumeration was capped: full=%d summaries=%d", len(episodes), len(summaries))
+	}
+	if got, want := summaryEpisodeIDs(summaries), transcriptEpisodeIDs(episodes); !equalStrings(got, want) {
+		t.Fatalf("summary/full episode ids differ:\nsummary=%v\nfull=%v", got, want)
+	}
+}
+
+func TestTranscriptEpisodeSummaryRetainsHistoryBeforeFilterWindowForClassification(t *testing.T) {
+	env := syncEpisodeCorpus(t, 1)
+	from := time.Date(2026, 8, 20, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 8, 20, 0, 1, 0, 0, time.UTC)
+	filter := TranscriptEpisodeFilter{
+		Filter:     Filter{Agent: AgentCodex, From: from, To: to},
+		AnchorType: AnchorRequirementRestatement,
+	}
+
+	episodes, err := ListTranscriptEpisodes(context.Background(), env, filter, EpisodeOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	summaries, err := ListTranscriptEpisodeSummaries(context.Background(), env, filter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(episodes) != 1 || len(summaries) != 1 {
+		t.Fatalf("window boundary classification differs: full=%d summaries=%d", len(episodes), len(summaries))
+	}
+	if summaries[0].EpisodeID != episodes[0].EpisodeID {
+		t.Fatalf("boundary episode id differs: summary=%q full=%q", summaries[0].EpisodeID, episodes[0].EpisodeID)
+	}
+}
+
+func TestEpisodeCorpusProvidesAllAnchorTypesWithSummaryParity(t *testing.T) {
+	env := syncEpisodeCorpus(t, 64)
+	filter := TranscriptEpisodeFilter{Filter: Filter{
+		Agent: AgentCodex,
+		From:  time.Date(2026, 8, 20, 0, 0, 0, 0, time.UTC),
+		To:    time.Date(2026, 8, 20, 23, 59, 59, 0, time.UTC),
+	}}
+	episodes, err := ListTranscriptEpisodes(context.Background(), env, filter, EpisodeOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	summaries, err := ListTranscriptEpisodeSummaries(context.Background(), env, filter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := summaryEpisodeIDs(summaries), transcriptEpisodeIDs(episodes); !equalStrings(got, want) {
+		t.Fatalf("summary/full episode ids differ:\nsummary=%v\nfull=%v", got, want)
+	}
+	counts := make(map[string]int)
+	for _, episode := range episodes {
+		counts[episode.Trigger.Type]++
+	}
+	want := map[string]int{
+		string(AnchorDesignDirection):        64,
+		string(AnchorRequirementRestatement): 1,
+		string(AnchorUserCorrection):         1,
+		string(AnchorScopeRevision):          1,
+		string(AnchorTestFailure):            1,
+		string(AnchorError):                  1,
+	}
+	for trigger, expected := range want {
+		if counts[trigger] != expected {
+			t.Errorf("trigger %s = %d, want %d (all=%v)", trigger, counts[trigger], expected, counts)
+		}
 	}
 }
 
@@ -116,7 +206,7 @@ func TestBuildAndWriteTranscriptEpisode(t *testing.T) {
 func syncCodexDesignFixture(t *testing.T) Environment {
 	t.Helper()
 	home := t.TempDir()
-	env := Environment{Home: home, LookupEnv: mapLookup(nil)}
+	env := testEnvironment(home)
 	data, err := os.ReadFile(filepath.Join("testdata", "codex.jsonl"))
 	if err != nil {
 		t.Fatal(err)
@@ -128,4 +218,47 @@ func syncCodexDesignFixture(t *testing.T) Environment {
 		t.Fatal(err)
 	}
 	return env
+}
+
+func syncEpisodeCorpus(t *testing.T, count int) Environment {
+	t.Helper()
+	corpus, err := sessionfixture.WriteEpisodeCorpus(filepath.Join(t.TempDir(), "corpus"), count)
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := Environment{Home: corpus.Home, StateDir: corpus.StateDir, LookupEnv: mapLookup(nil)}
+	if _, err := Sync(context.Background(), SyncOptions{Environment: env, Agents: []Agent{AgentCodex}}); err != nil {
+		t.Fatal(err)
+	}
+	return env
+}
+
+func transcriptEpisodeIDs(episodes []TranscriptEpisode) []string {
+	ids := make([]string, 0, len(episodes))
+	for _, episode := range episodes {
+		ids = append(ids, episode.EpisodeID)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func summaryEpisodeIDs(summaries []TranscriptEpisodeSummary) []string {
+	ids := make([]string, 0, len(summaries))
+	for _, summary := range summaries {
+		ids = append(ids, summary.EpisodeID)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func equalStrings(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
 }

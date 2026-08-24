@@ -11,6 +11,7 @@ import (
 	"github.com/rike422/shoka/internal/mcpserver"
 	"github.com/rike422/shoka/internal/root"
 	"github.com/rike422/shoka/internal/search"
+	shokasession "github.com/rike422/shoka/internal/session"
 )
 
 func main() {
@@ -37,9 +38,17 @@ func main() {
 	case "hook":
 		err = cmdHook(args)
 	case "session":
-		err = cmdSession(args)
+		var env shokasession.Environment
+		env, err = shokasession.CurrentEnvironment()
+		if err == nil {
+			err = cmdSession(env, args)
+		}
 	case "transcript":
-		err = cmdTranscript(args)
+		var env shokasession.Environment
+		env, err = shokasession.CurrentEnvironment()
+		if err == nil {
+			err = cmdTranscript(env, args)
+		}
 	case "help", "-h", "--help":
 		usage()
 	default:

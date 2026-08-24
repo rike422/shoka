@@ -137,6 +137,23 @@ The session index is separate from the per-repository code index. It defaults to
 `XDG_STATE_HOME` to change the state root. The directory is mode `0700` and the
 database is mode `0600` on POSIX systems.
 
+For local development, create a small isolated database without reading or
+reindexing real agent logs:
+
+```bash
+go run -tags fts5 ./cmd/shoka-testfixture \
+  --output .tmp/shoka-fixtures/episode-pipeline \
+  --sessions 64
+
+SHOKA_STATE_DIR=/absolute/path/to/shoka/.tmp/shoka-fixtures/episode-pipeline/state \
+  shoka transcript episode list --from 2026-08-20 --to 2026-08-20 --json
+```
+
+The fixture command writes native Codex JSONL first and passes it through the
+production sync path to create `sessions.db`; it never inserts directly into
+SQLite. The output directory must be new, preventing an existing database from
+being overwritten. Generated fixtures under `.tmp/` are ignored by Git.
+
 Initial adapters:
 
 | Agent | Source |

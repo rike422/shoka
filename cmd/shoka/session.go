@@ -18,50 +18,51 @@ type parsedOptions struct {
 	positionals []string
 }
 
-func cmdSession(args []string) error {
+func cmdSession(env shokasession.Environment, args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("usage: shoka session sync|list|show|search|export|reindex")
 	}
 	switch args[0] {
 	case "sync":
-		return cmdSessionSync(args[1:])
+		return cmdSessionSync(env, args[1:])
 	case "list":
-		return cmdSessionList(args[1:])
+		return cmdSessionList(env, args[1:])
 	case "show":
-		return cmdSessionShow(args[1:])
+		return cmdSessionShow(env, args[1:])
 	case "search":
-		return cmdSessionSearch(args[1:])
+		return cmdSessionSearch(env, args[1:])
 	case "export":
-		return cmdSessionExport(args[1:])
+		return cmdSessionExport(env, args[1:])
 	case "reindex":
-		return cmdSessionReindex(args[1:])
+		return cmdSessionReindex(env, args[1:])
 	default:
 		return fmt.Errorf("unknown session subcommand: %s", args[0])
 	}
 }
 
-func cmdTranscript(args []string) error {
+func cmdTranscript(env shokasession.Environment, args []string) error {
 	if len(args) < 2 || args[0] != "episode" {
 		return fmt.Errorf("usage: shoka transcript episode list|search|export")
 	}
 	args = args[1:]
 	switch args[0] {
 	case "list":
-		return cmdTranscriptEpisodeList(args[1:])
+		return cmdTranscriptEpisodeList(env, args[1:])
 	case "search":
-		return cmdTranscriptEpisodeSearch(args[1:])
+		return cmdTranscriptEpisodeSearch(env, args[1:])
 	case "export":
-		return cmdTranscriptEpisodeExport(args[1:])
+		return cmdTranscriptEpisodeExport(env, args[1:])
 	default:
 		return fmt.Errorf("unknown transcript episode subcommand: %s", args[0])
 	}
 }
 
-func cmdTranscriptEpisodeList(args []string) error {
+func cmdTranscriptEpisodeList(env shokasession.Environment, args []string) error {
 	if hasCLIFlag(args, "--verbose") {
 		fmt.Fprintf(os.Stderr, "[transcript verbose] episode list entry args_count=%d\n", len(args))
 	}
 	spec := filterOptionSpec(false)
+	delete(spec, "--top")
 	addEpisodeOptionSpec(spec)
 	spec["--verbose"] = false
 	parsed, err := parseCommandOptions(args, spec)
@@ -78,10 +79,6 @@ func cmdTranscriptEpisodeList(args []string) error {
 	filter = applyDefaultTranscriptEpisodeListRange(filter, parsed, time.Now().UTC())
 	filter.Verbose = parsed.booleans["--verbose"]
 	options, err := episodeOptionsFromParsed(parsed)
-	if err != nil {
-		return err
-	}
-	env, err := shokasession.CurrentEnvironment()
 	if err != nil {
 		return err
 	}
@@ -133,7 +130,7 @@ func transcriptEpisodeFilterFromOptions(parsed parsedOptions) (shokasession.Tran
 	return filter, nil
 }
 
-func cmdTranscriptEpisodeSearch(args []string) error {
+func cmdTranscriptEpisodeSearch(env shokasession.Environment, args []string) error {
 	spec := filterOptionSpec(false)
 	addEpisodeOptionSpec(spec)
 	parsed, err := parseCommandOptions(args, spec)
@@ -148,10 +145,6 @@ func cmdTranscriptEpisodeSearch(args []string) error {
 		return err
 	}
 	options, err := episodeOptionsFromParsed(parsed)
-	if err != nil {
-		return err
-	}
-	env, err := shokasession.CurrentEnvironment()
 	if err != nil {
 		return err
 	}
@@ -173,7 +166,7 @@ func cmdTranscriptEpisodeSearch(args []string) error {
 	return nil
 }
 
-func cmdTranscriptEpisodeExport(args []string) error {
+func cmdTranscriptEpisodeExport(env shokasession.Environment, args []string) error {
 	spec := map[string]bool{"--output": true}
 	addEpisodeOptionSpec(spec)
 	parsed, err := parseCommandOptions(args, spec)
@@ -184,10 +177,6 @@ func cmdTranscriptEpisodeExport(args []string) error {
 		return fmt.Errorf("usage: shoka transcript episode export EPISODE_ID --output PATH")
 	}
 	options, err := episodeOptionsFromParsed(parsed)
-	if err != nil {
-		return err
-	}
-	env, err := shokasession.CurrentEnvironment()
 	if err != nil {
 		return err
 	}
@@ -241,17 +230,13 @@ func episodeOptionsFromParsed(parsed parsedOptions) (shokasession.EpisodeOptions
 	return options, nil
 }
 
-func cmdSessionSync(args []string) error {
+func cmdSessionSync(env shokasession.Environment, args []string) error {
 	parsed, err := parseCommandOptions(args, map[string]bool{"--agent": true, "--dry-run": false, "--json": false})
 	if err != nil {
 		return err
 	}
 	if len(parsed.positionals) != 0 {
 		return fmt.Errorf("session sync does not accept positional arguments")
-	}
-	env, err := shokasession.CurrentEnvironment()
-	if err != nil {
-		return err
 	}
 	var agents []shokasession.Agent
 	if value := parsed.values["--agent"]; value != "" && value != "all" {
@@ -287,7 +272,7 @@ func cmdSessionSync(args []string) error {
 	return nil
 }
 
-func cmdSessionList(args []string) error {
+func cmdSessionList(env shokasession.Environment, args []string) error {
 	parsed, err := parseCommandOptions(args, filterOptionSpec(true))
 	if err != nil {
 		return err
@@ -296,10 +281,6 @@ func cmdSessionList(args []string) error {
 		return fmt.Errorf("session list does not accept positional arguments")
 	}
 	filter, err := filterFromOptions(parsed)
-	if err != nil {
-		return err
-	}
-	env, err := shokasession.CurrentEnvironment()
 	if err != nil {
 		return err
 	}
@@ -316,17 +297,13 @@ func cmdSessionList(args []string) error {
 	return nil
 }
 
-func cmdSessionShow(args []string) error {
+func cmdSessionShow(env shokasession.Environment, args []string) error {
 	parsed, err := parseCommandOptions(args, map[string]bool{"--json": false})
 	if err != nil {
 		return err
 	}
 	if len(parsed.positionals) != 1 {
 		return fmt.Errorf("usage: shoka session show SESSION_ID [--json]")
-	}
-	env, err := shokasession.CurrentEnvironment()
-	if err != nil {
-		return err
 	}
 	detail, err := shokasession.ShowSession(context.Background(), env, parsed.positionals[0])
 	if err != nil {
@@ -346,7 +323,7 @@ func cmdSessionShow(args []string) error {
 	return nil
 }
 
-func cmdSessionSearch(args []string) error {
+func cmdSessionSearch(env shokasession.Environment, args []string) error {
 	parsed, err := parseCommandOptions(args, filterOptionSpec(false))
 	if err != nil {
 		return err
@@ -355,10 +332,6 @@ func cmdSessionSearch(args []string) error {
 		return fmt.Errorf("session search requires a QUERY")
 	}
 	filter, err := filterFromOptions(parsed)
-	if err != nil {
-		return err
-	}
-	env, err := shokasession.CurrentEnvironment()
 	if err != nil {
 		return err
 	}
@@ -379,17 +352,13 @@ func cmdSessionSearch(args []string) error {
 	return nil
 }
 
-func cmdSessionExport(args []string) error {
+func cmdSessionExport(env shokasession.Environment, args []string) error {
 	parsed, err := parseCommandOptions(args, map[string]bool{"--output": true})
 	if err != nil {
 		return err
 	}
 	if len(parsed.positionals) != 1 || parsed.values["--output"] == "" {
 		return fmt.Errorf("usage: shoka session export SESSION_ID --output PATH")
-	}
-	env, err := shokasession.CurrentEnvironment()
-	if err != nil {
-		return err
 	}
 	if err := shokasession.WriteSessionEvidence(context.Background(), env, parsed.positionals[0], parsed.values["--output"]); err != nil {
 		return err
@@ -398,17 +367,13 @@ func cmdSessionExport(args []string) error {
 	return nil
 }
 
-func cmdSessionReindex(args []string) error {
+func cmdSessionReindex(env shokasession.Environment, args []string) error {
 	parsed, err := parseCommandOptions(args, map[string]bool{"--json": false})
 	if err != nil {
 		return err
 	}
 	if len(parsed.positionals) != 0 {
 		return fmt.Errorf("session reindex does not accept positional arguments")
-	}
-	env, err := shokasession.CurrentEnvironment()
-	if err != nil {
-		return err
 	}
 	stats, err := shokasession.Reindex(context.Background(), env)
 	if err != nil {

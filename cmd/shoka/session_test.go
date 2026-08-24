@@ -30,9 +30,20 @@ func TestDefaultTranscriptEpisodeListRange(t *testing.T) {
 func TestSessionCLIWorkflow(t *testing.T) {
 	home := t.TempDir()
 	stateDir := filepath.Join(t.TempDir(), "state")
-	t.Setenv("HOME", home)
-	t.Setenv("SHOKA_STATE_DIR", stateDir)
-	t.Setenv("CODEX_HOME", filepath.Join(home, ".codex"))
+	processStateDir := filepath.Join(t.TempDir(), "process-state")
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("SHOKA_STATE_DIR", processStateDir)
+	t.Setenv("CODEX_HOME", filepath.Join(t.TempDir(), "process-codex"))
+	env := shokasession.Environment{
+		Home:     home,
+		StateDir: stateDir,
+		LookupEnv: func(name string) (string, bool) {
+			if name == "CODEX_HOME" {
+				return filepath.Join(home, ".codex"), true
+			}
+			return "", false
+		},
+	}
 	data, err := os.ReadFile(filepath.Join("..", "..", "internal", "session", "testdata", "codex.jsonl"))
 	if err != nil {
 		t.Fatal(err)
@@ -48,7 +59,7 @@ func TestSessionCLIWorkflow(t *testing.T) {
 	}
 
 	dryRun := captureStdout(t, func() error {
-		return cmdSession([]string{"sync", "--agent", "codex", "--dry-run", "--json"})
+		return cmdSession(env, []string{"sync", "--agent", "codex", "--dry-run", "--json"})
 	})
 	if !strings.Contains(dryRun, `"sources_read": 1`) {
 		t.Fatalf("unexpected dry-run output: %s", dryRun)
@@ -58,14 +69,17 @@ func TestSessionCLIWorkflow(t *testing.T) {
 	}
 
 	syncOutput := captureStdout(t, func() error {
-		return cmdSession([]string{"sync", "--agent", "codex", "--json"})
+		return cmdSession(env, []string{"sync", "--agent", "codex", "--json"})
 	})
 	if !strings.Contains(syncOutput, `"events_added"`) {
 		t.Fatalf("unexpected sync output: %s", syncOutput)
 	}
+	if _, err := os.Stat(filepath.Join(processStateDir, "sessions.db")); !os.IsNotExist(err) {
+		t.Fatalf("injected command selected process state: %v", err)
+	}
 
 	listOutput := captureStdout(t, func() error {
-		return cmdSession([]string{"list", "--agent", "codex", "--json"})
+		return cmdSession(env, []string{"list", "--agent", "codex", "--json"})
 	})
 	var listed []map[string]any
 	if err := json.Unmarshal([]byte(listOutput), &listed); err != nil {
@@ -76,7 +90,7 @@ func TestSessionCLIWorkflow(t *testing.T) {
 	}
 
 	episodeListOutput := captureStdout(t, func() error {
-		return cmdTranscript([]string{"episode", "list", "--agent", "codex", "--event-type", "design_direction", "--from", "2026-08-20", "--to", "2026-08-20", "--json"})
+		return cmdTranscript(env, []string{"episode", "list", "--agent", "codex", "--event-type", "design_direction", "--from", "2026-08-20", "--to", "2026-08-20", "--json"})
 	})
 	var listedEpisodes []map[string]any
 	if err := json.Unmarshal([]byte(episodeListOutput), &listedEpisodes); err != nil {
@@ -90,28 +104,28 @@ func TestSessionCLIWorkflow(t *testing.T) {
 		t.Fatalf("unexpected design trigger: %+v", listedEpisodes[0]["trigger"])
 	}
 	plainEpisodeListOutput := captureStdout(t, func() error {
-		return cmdTranscript([]string{"episode", "list", "--agent", "codex", "--event-type", "design_direction", "--from", "2026-08-20", "--to", "2026-08-20"})
+		return cmdTranscript(env, []string{"episode", "list", "--agent", "codex", "--event-type", "design_direction", "--from", "2026-08-20", "--to", "2026-08-20"})
 	})
 	if !strings.Contains(plainEpisodeListOutput, "2026-08-20T01:00:06Z") || !strings.Contains(plainEpisodeListOutput, "trigger=design_direction") {
 		t.Fatalf("episode list output lacks date or trigger: %s", plainEpisodeListOutput)
 	}
 
 	searchOutput := captureStdout(t, func() error {
-		return cmdSession([]string{"search", "go test", "--agent", "codex", "--event-type", "test", "--json"})
+		return cmdSession(env, []string{"search", "go test", "--agent", "codex", "--event-type", "test", "--json"})
 	})
 	if !strings.Contains(searchOutput, "go test ./...") {
 		t.Fatalf("unexpected search output: %s", searchOutput)
 	}
 
 	showOutput := captureStdout(t, func() error {
-		return cmdSession([]string{"show", "codex-session", "--json"})
+		return cmdSession(env, []string{"show", "codex-session", "--json"})
 	})
 	if !strings.Contains(showOutput, `"source"`) || !strings.Contains(showOutput, `"hash"`) {
 		t.Fatalf("show lacks source references: %s", showOutput)
 	}
 
 	evidencePath := filepath.Join(t.TempDir(), "evidence.json")
-	if err := cmdSession([]string{"export", "codex-session", "--output", evidencePath}); err != nil {
+	if err := cmdSession(env, []string{"export", "codex-session", "--output", evidencePath}); err != nil {
 		t.Fatal(err)
 	}
 	evidence, err := os.ReadFile(evidencePath)
@@ -123,7 +137,7 @@ func TestSessionCLIWorkflow(t *testing.T) {
 	}
 
 	episodeSearchOutput := captureStdout(t, func() error {
-		return cmdTranscript([]string{"episode", "search", "migration test failed", "--agent", "codex", "--before", "1", "--after", "2", "--json"})
+		return cmdTranscript(env, []string{"episode", "search", "migration test failed", "--agent", "codex", "--before", "1", "--after", "2", "--json"})
 	})
 	if !strings.Contains(episodeSearchOutput, `"raw_events": 1`) || !strings.Contains(episodeSearchOutput, `"transcript-episode/v1"`) {
 		t.Fatalf("unexpected episode search output: %s", episodeSearchOutput)
@@ -138,7 +152,7 @@ func TestSessionCLIWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 	episodePath := filepath.Join(t.TempDir(), "episode.json")
-	if err := cmdTranscript([]string{"episode", "export", episodeResult.Episodes[0].EpisodeID, "--output", episodePath, "--before", "1", "--after", "2"}); err != nil {
+	if err := cmdTranscript(env, []string{"episode", "export", episodeResult.Episodes[0].EpisodeID, "--output", episodePath, "--before", "1", "--after", "2"}); err != nil {
 		t.Fatal(err)
 	}
 	episodeEvidence, err := os.ReadFile(episodePath)
@@ -151,7 +165,7 @@ func TestSessionCLIWorkflow(t *testing.T) {
 	assertTranscriptEpisodeShape(t, episodeEvidence)
 
 	reindexOutput := captureStdout(t, func() error {
-		return cmdSession([]string{"reindex", "--json"})
+		return cmdSession(env, []string{"reindex", "--json"})
 	})
 	if !strings.Contains(reindexOutput, `"sources_read": 1`) {
 		t.Fatalf("unexpected reindex output: %s", reindexOutput)
@@ -216,9 +230,14 @@ func assertSourceShape(t *testing.T, evidence map[string]any) {
 }
 
 func TestSessionCLIRejectsUnknownFlags(t *testing.T) {
-	err := cmdSession([]string{"list", "--agnet", "claude"})
+	env := shokasession.Environment{Home: t.TempDir(), StateDir: t.TempDir()}
+	err := cmdSession(env, []string{"list", "--agnet", "claude"})
 	if err == nil || !strings.Contains(err.Error(), "unknown flag") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	err = cmdTranscript(env, []string{"episode", "list", "--top", "10"})
+	if err == nil || !strings.Contains(err.Error(), "unknown flag") {
+		t.Fatalf("episode list accepted an incomplete TopK contract: %v", err)
 	}
 }
 
