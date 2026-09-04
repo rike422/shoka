@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,11 +26,11 @@ func TestListTranscriptEpisodeSummariesFiltersAnchorTypeAndTriggerDate(t *testin
 	if len(summaries) != 1 {
 		t.Fatalf("summaries = %+v", summaries)
 	}
-	if summaries[0].Trigger.Type != string(AnchorDesignDirection) {
-		t.Fatalf("trigger type = %q", summaries[0].Trigger.Type)
+	if summaries[0].EventType != string(AnchorDesignDirection) {
+		t.Fatalf("event type = %q", summaries[0].EventType)
 	}
-	if summaries[0].Trigger.Timestamp != "2026-08-20T01:00:06Z" {
-		t.Fatalf("trigger timestamp = %q", summaries[0].Trigger.Timestamp)
+	if summaries[0].Timestamp != "2026-08-20T01:00:06Z" {
+		t.Fatalf("timestamp = %q", summaries[0].Timestamp)
 	}
 
 	outside, err := ListTranscriptEpisodeSummaries(context.Background(), env, TranscriptEpisodeFilter{
@@ -57,8 +58,22 @@ func TestListTranscriptEpisodeSummaries(t *testing.T) {
 	if len(summaries) != 1 {
 		t.Fatalf("summaries = %+v", summaries)
 	}
-	if summaries[0].EpisodeID == "" || summaries[0].Trigger.Type != string(AnchorDesignDirection) || summaries[0].Trigger.Timestamp != "2026-08-20T01:00:06Z" {
+	if summaries[0].EpisodeID == "" || summaries[0].EventType != string(AnchorDesignDirection) || summaries[0].Timestamp != "2026-08-20T01:00:06Z" {
 		t.Fatalf("unexpected summary = %+v", summaries[0])
+	}
+}
+
+func TestTranscriptEpisodeSummaryJSONIsMinimal(t *testing.T) {
+	summary := TranscriptEpisodeSummary{
+		EpisodeID: "episode-1", Timestamp: "2026-08-20T00:00:00Z", EventType: string(AnchorError),
+		TranscriptID: "session-1", TaskLineageID: "lineage-1", ProjectID: "project-1", TaskStatus: "failed",
+	}
+	encoded, err := json.Marshal(summary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(encoded) != `{"episode_id":"episode-1","timestamp":"2026-08-20T00:00:00Z","event_type":"error"}` {
+		t.Fatalf("episode list JSON = %s", encoded)
 	}
 }
 
@@ -93,6 +108,39 @@ func TestTranscriptEpisodeSummaryEnumerationIsNotCappedByInteractiveTopK(t *test
 	}
 }
 
+func TestTranscriptEpisodeSummaryLimitReturnsNewestEpisodes(t *testing.T) {
+	env := syncEpisodeCorpus(t, 64)
+	filter := TranscriptEpisodeFilter{
+		Filter: Filter{
+			Agent: AgentCodex,
+			From:  time.Date(2026, 8, 20, 0, 0, 0, 0, time.UTC),
+			To:    time.Date(2026, 8, 20, 23, 59, 59, 0, time.UTC),
+		},
+		AnchorType: AnchorDesignDirection,
+		Limit:      10,
+	}
+
+	summaries, err := ListTranscriptEpisodeSummaries(context.Background(), env, filter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summaries) != 10 {
+		t.Fatalf("limited summaries = %d", len(summaries))
+	}
+	for index := 1; index < len(summaries); index++ {
+		if summaries[index-1].Timestamp < summaries[index].Timestamp {
+			t.Fatalf("summaries are not newest-first: %+v", summaries)
+		}
+	}
+}
+
+func TestTranscriptEpisodeSummaryRejectsNegativeLimit(t *testing.T) {
+	_, err := ListTranscriptEpisodeSummaries(context.Background(), Environment{}, TranscriptEpisodeFilter{Limit: -1})
+	if err == nil || !strings.Contains(err.Error(), "limit") {
+		t.Fatalf("negative episode limit error = %v", err)
+	}
+}
+
 func TestTranscriptEpisodeSummaryRetainsHistoryBeforeFilterWindowForClassification(t *testing.T) {
 	env := syncEpisodeCorpus(t, 1)
 	from := time.Date(2026, 8, 20, 0, 0, 0, 0, time.UTC)
@@ -124,7 +172,7 @@ func TestEpisodeCorpusProvidesAllAnchorTypesWithSummaryParity(t *testing.T) {
 	}
 	counts := make(map[string]int)
 	for _, summary := range summaries {
-		counts[summary.Trigger.Type]++
+		counts[summary.EventType]++
 	}
 	want := map[string]int{
 		string(AnchorDesignDirection):        64,
@@ -178,7 +226,7 @@ func TestSummarizeTranscriptEpisodeMetadataDeduplicatesEpisodeIDs(t *testing.T) 
 		TranscriptID:  "session-1",
 		TaskLineageID: "lineage-1",
 		ProjectID:     "project-1",
-		Trigger:       TranscriptTrigger{Type: string(AnchorError)},
+		EventType:     string(AnchorError),
 		TaskStatus:    "failed",
 	}
 	summary := SummarizeTranscriptEpisodeMetadata([]TranscriptEpisodeSummary{item, item})

@@ -42,18 +42,30 @@ type TranscriptTrigger struct {
 
 // TranscriptEvidence is an allowlisted, source-linked event projection.
 type TranscriptEvidence struct {
-	EventID     int64           `json:"event_id"`
-	EventType   EventKind       `json:"event_type"`
-	Role        Role            `json:"role"`
-	Timestamp   string          `json:"timestamp,omitempty"`
-	Text        string          `json:"text,omitempty"`
-	Command     string          `json:"command,omitempty"`
-	Diff        string          `json:"diff,omitempty"`
-	Files       []string        `json:"files,omitempty"`
-	ExitCode    *int            `json:"exit_code,omitempty"`
-	Outcome     string          `json:"outcome,omitempty"`
-	ContentHash string          `json:"content_hash,omitempty"`
-	Source      SourceReference `json:"source"`
+	EventID              int64           `json:"event_id"`
+	EventType            EventKind       `json:"event_type"`
+	Role                 Role            `json:"role"`
+	Timestamp            string          `json:"timestamp,omitempty"`
+	Text                 string          `json:"text,omitempty"`
+	TextTruncated        bool            `json:"text_truncated,omitempty"`
+	TextOriginalBytes    int             `json:"text_original_bytes,omitempty"`
+	TextOmittedBytes     int             `json:"text_omitted_bytes,omitempty"`
+	TextSHA256           string          `json:"text_sha256,omitempty"`
+	Command              string          `json:"command,omitempty"`
+	CommandTruncated     bool            `json:"command_truncated,omitempty"`
+	CommandOriginalBytes int             `json:"command_original_bytes,omitempty"`
+	CommandOmittedBytes  int             `json:"command_omitted_bytes,omitempty"`
+	CommandSHA256        string          `json:"command_sha256,omitempty"`
+	Diff                 string          `json:"diff,omitempty"`
+	DiffTruncated        bool            `json:"diff_truncated,omitempty"`
+	DiffOriginalBytes    int             `json:"diff_original_bytes,omitempty"`
+	DiffOmittedBytes     int             `json:"diff_omitted_bytes,omitempty"`
+	DiffSHA256           string          `json:"diff_sha256,omitempty"`
+	Files                []string        `json:"files,omitempty"`
+	ExitCode             *int            `json:"exit_code,omitempty"`
+	Outcome              string          `json:"outcome,omitempty"`
+	ContentHash          string          `json:"content_hash,omitempty"`
+	Source               SourceReference `json:"source"`
 }
 
 // TranscriptOutcome records an observed result without inferring success from
@@ -77,19 +89,20 @@ type TranscriptOmissions struct {
 
 // TranscriptEpisode is Shoka's deterministic correction/result evidence unit.
 type TranscriptEpisode struct {
-	SchemaVersion         string               `json:"schema_version"`
-	EpisodeID             string               `json:"episode_id"`
-	TranscriptID          string               `json:"transcript_id"`
-	NativeSessionID       string               `json:"native_session_id"`
-	TaskLineageID         string               `json:"task_lineage_id"`
-	ProjectID             string               `json:"project_id"`
-	WorkspaceID           string               `json:"workspace_id,omitempty"`
-	Trigger               TranscriptTrigger    `json:"trigger"`
-	ContextBefore         []TranscriptEvidence `json:"context_before"`
-	Corrections           []TranscriptEvidence `json:"corrections"`
-	ActionsAfter          []TranscriptEvidence `json:"actions_after"`
-	Outcomes              []TranscriptOutcome  `json:"outcomes"`
-	FinalReport           *TranscriptEvidence  `json:"final_report,omitempty"`
+	SchemaVersion   string               `json:"schema_version"`
+	EpisodeID       string               `json:"episode_id"`
+	TranscriptID    string               `json:"transcript_id"`
+	NativeSessionID string               `json:"native_session_id"`
+	TaskLineageID   string               `json:"task_lineage_id"`
+	ProjectID       string               `json:"project_id"`
+	WorkspaceID     string               `json:"workspace_id,omitempty"`
+	Trigger         TranscriptTrigger    `json:"trigger"`
+	ContextBefore   []TranscriptEvidence `json:"context_before"`
+	Corrections     []TranscriptEvidence `json:"corrections"`
+	ActionsAfter    []TranscriptEvidence `json:"actions_after"`
+	Outcomes        []TranscriptOutcome  `json:"outcomes"`
+	FinalReport     *TranscriptEvidence  `json:"final_report,omitempty"`
+	// Deprecated: corrections are emitted once in Corrections.
 	AdditionalCorrections []TranscriptEvidence `json:"additional_corrections,omitempty"`
 	TaskStatus            string               `json:"task_status"`
 	SourceEventIDs        []int64              `json:"source_event_ids"`
@@ -267,11 +280,6 @@ func BuildTranscriptEpisodeFromEvents(input TranscriptBuildInput) (TranscriptEpi
 			episode.FinalReport = &copy
 		}
 	}
-	for _, item := range episode.Corrections {
-		if item.EventID != episode.Trigger.EventID {
-			episode.AdditionalCorrections = append(episode.AdditionalCorrections, item)
-		}
-	}
 	if episode.Omitted.Context > 0 || episode.Omitted.Actions > 0 || episode.Omitted.Outcomes > 0 {
 		episode.Omitted.Events = episode.Omitted.Context + episode.Omitted.Actions + episode.Omitted.Outcomes
 	}
@@ -291,7 +299,38 @@ func isCorrectionEvent(events []Event, index int) bool {
 }
 
 func episodeEvidence(event Event) TranscriptEvidence {
-	return TranscriptEvidence{EventID: event.ID, EventType: event.Kind, Role: event.Role, Timestamp: event.Timestamp, Text: event.Text, Command: event.Command, Diff: event.Diff, Files: append([]string{}, event.Files...), ExitCode: event.ExitCode, ContentHash: event.ContentHash, Source: event.Source}
+	item := TranscriptEvidence{
+		EventID: event.ID, EventType: event.Kind, Role: event.Role, Timestamp: event.Timestamp,
+		Text: event.Text, Command: event.Command, Diff: event.Diff, Files: append([]string{}, event.Files...),
+		ExitCode: event.ExitCode, ContentHash: event.ContentHash, Source: event.Source,
+	}
+	if event.TextTruncated {
+		item.TextTruncated = true
+		item.TextOriginalBytes = event.TextOriginalBytes
+		item.TextOmittedBytes = omittedBytes(event.TextOriginalBytes, event.Text)
+		item.TextSHA256 = event.TextSHA256
+	}
+	if event.CommandTruncated {
+		item.CommandTruncated = true
+		item.CommandOriginalBytes = event.CommandOriginalBytes
+		item.CommandOmittedBytes = omittedBytes(event.CommandOriginalBytes, event.Command)
+		item.CommandSHA256 = event.CommandSHA256
+	}
+	if event.DiffTruncated {
+		item.DiffTruncated = true
+		item.DiffOriginalBytes = event.DiffOriginalBytes
+		item.DiffOmittedBytes = omittedBytes(event.DiffOriginalBytes, event.Diff)
+		item.DiffSHA256 = event.DiffSHA256
+	}
+	return item
+}
+
+func omittedBytes(original int, retained string) int {
+	omitted := original - len(retained)
+	if omitted < 0 {
+		return 0
+	}
+	return omitted
 }
 
 func validateEpisodeSource(event Event) error {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	"github.com/rike422/shoka/internal/hook"
@@ -37,6 +38,13 @@ func main() {
 		err = cmdMCP(args)
 	case "hook":
 		err = cmdHook(args)
+	case "version", "--version":
+		if len(args) != 0 {
+			err = fmt.Errorf("version does not accept arguments")
+		} else {
+			info, ok := debug.ReadBuildInfo()
+			fmt.Print(formatVersionInfo(info, ok))
+		}
 	case "session":
 		var env shokasession.Environment
 		env, err = shokasession.CurrentEnvironment()
@@ -81,14 +89,15 @@ Usage:
   shoka mcp [--root PATH]
   shoka hook install [--root PATH]
   shoka hook uninstall [--root PATH]
+  shoka version
   shoka session sync [--agent all|codex|claude|opencode|cursor|pi] [--dry-run] [--json]
   shoka session list [--agent AGENT] [--repository PATH] [--json]
   shoka session show SESSION_ID [--json]
   shoka session search QUERY [--agent AGENT] [--event-type TYPE] [--file PATH] [--json]
   shoka session export SESSION_ID --output PATH
   shoka session reindex [--json]
-  shoka transcript episode list [--agent AGENT] [--event-type TYPE] [--file PATH] [--from DATE] [--to DATE] [--json] [--verbose]
-  shoka transcript episode summary [--agent AGENT] [--event-type TYPE] [--file PATH] [--from DATE] [--to DATE] [--json] [--verbose]
+  shoka transcript episode list [--agent AGENT] [--event-type TYPE] [--file PATH] [--from DATE] [--to DATE] [--limit N] [--include-subagents] [--json] [--verbose]
+  shoka transcript episode summary [--agent AGENT] [--event-type TYPE] [--file PATH] [--from DATE] [--to DATE] [--include-subagents] [--json] [--verbose]
   shoka transcript episode search QUERY [--before N] [--after N] [--json]
   shoka transcript episode export EPISODE_ID --output PATH
 
@@ -96,6 +105,38 @@ Environment:
   SHOKA_ROOT        Default project root (overridden by --root)
   SHOKA_STATE_DIR   Session index state directory
 `)
+}
+
+func formatVersionInfo(info *debug.BuildInfo, ok bool) string {
+	version := "(devel)"
+	settings := map[string]string{}
+	if ok && info != nil {
+		if info.Main.Version != "" && info.Main.Version != "(devel)" {
+			version = info.Main.Version
+		}
+		for _, setting := range info.Settings {
+			settings[setting.Key] = setting.Value
+		}
+	}
+	revision := settings["vcs.revision"]
+	if revision == "" {
+		revision = "unknown"
+	} else if len(revision) > 12 {
+		revision = revision[:12]
+	}
+	sourceTime := settings["vcs.time"]
+	if sourceTime == "" {
+		sourceTime = "unknown"
+	}
+	modified := settings["vcs.modified"]
+	if modified == "" {
+		modified = "unknown"
+	}
+	features := settings["-tags"]
+	if features == "" {
+		features = "none"
+	}
+	return fmt.Sprintf("shoka %s\ncommit: %s\nsource_time: %s\nmodified: %s\nfeatures: %s\n", version, revision, sourceTime, modified, features)
 }
 
 func cmdIndex(args []string) error {

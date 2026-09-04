@@ -206,21 +206,30 @@ analysis. Its `--event-type` selects an observable episode trigger such as
 `design_direction` or `scope_revision`; `--from` and `--to` filter the trigger
 timestamp, not merely the enclosing session lifetime. When neither date is
 specified, list defaults to the previous seven days. Both plain-text and JSON
-output contain only episode IDs and metadata; they never include context or
-evidence payloads. `transcript episode summary` uses the same lightweight path
-to report episode, session, task-lineage, and project counts plus trigger and
-task-status totals. Use explicit date windows to divide larger collections.
-Add `--verbose` to print progress and memory diagnostics to stderr without
-printing transcript content.
+output contain only `episode_id`, `timestamp`, and `event_type`; they never
+include identity, context, or evidence payloads. List orders the newest episodes
+first, returns at most 100 by default, accepts an explicit `--limit`, and
+excludes subagents unless `--include-subagents` is set. Its JSON output is
+compact for machine consumption. `transcript episode summary` uses the same
+lightweight path to report episode, session, task-lineage, and project counts
+plus trigger and task-status totals. Use explicit date windows to divide larger
+collections. Add `--verbose` to print progress and memory diagnostics to stderr
+without printing transcript content.
+
+Run `shoka version` to inspect the embedded module version, source revision,
+source timestamp, dirty-build state, and build tags such as `fts5`.
 
 `transcript episode search` and `transcript episode export` use the separate
 [`transcript-episode/v1`](docs/transcript-episode-v1.schema.json) contract. Episodes
 start only at observable correction anchors, including repeated requests,
 scope/design directions, explicit errors, and test failures. They retain
 bounded context, actions, outcomes, task status, source event IDs/hashes, and
-search reasons. Search output reports raw event, session, task-lineage, and
-project counts separately. Episode derivation never generates Skills, infers
-root causes, or synchronizes sessions implicitly.
+search reasons. Truncated text, commands, and diffs retain their original and
+omitted byte counts plus the complete redacted payload hash. Corrections are
+emitted once in `corrections`; the legacy `additional_corrections` field is
+deprecated and no longer generated. Search output reports raw event, session,
+task-lineage, and project counts separately. Episode derivation never generates
+Skills, infers root causes, or synchronizes sessions implicitly.
 
 The session database is a disposable derived index. `session reindex` first
 checks that raw sources are discoverable, then deletes `sessions.db` (including

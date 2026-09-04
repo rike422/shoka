@@ -64,8 +64,9 @@ func cmdTranscriptEpisodeList(env shokasession.Environment, args []string) error
 	if hasCLIFlag(args, "--verbose") {
 		fmt.Fprintf(os.Stderr, "[transcript verbose] episode list entry args_count=%d\n", len(args))
 	}
-	spec := filterOptionSpec(false)
+	spec := filterOptionSpec(true)
 	delete(spec, "--top")
+	spec["--limit"] = true
 	spec["--verbose"] = false
 	parsed, err := parseCommandOptions(args, spec)
 	if err != nil {
@@ -79,22 +80,23 @@ func cmdTranscriptEpisodeList(env shokasession.Environment, args []string) error
 		return err
 	}
 	filter = applyDefaultTranscriptEpisodeRange(filter, parsed, time.Now().UTC())
+	filter = applyDefaultTranscriptEpisodeLimit(filter, parsed)
 	filter.Verbose = parsed.booleans["--verbose"]
 	summaries, err := shokasession.ListTranscriptEpisodeSummaries(context.Background(), env, filter)
 	if err != nil {
 		return err
 	}
 	if parsed.booleans["--json"] {
-		return encodeJSON(summaries)
+		return encodeCompactJSON(summaries)
 	}
 	for _, summary := range summaries {
-		fmt.Printf("%s  %s  trigger=%s event=%d status=%s\n", summary.Trigger.Timestamp, summary.EpisodeID, summary.Trigger.Type, summary.Trigger.EventID, summary.TaskStatus)
+		fmt.Printf("%s  %s  event_type=%s\n", summary.Timestamp, summary.EpisodeID, summary.EventType)
 	}
 	return nil
 }
 
 func cmdTranscriptEpisodeSummary(env shokasession.Environment, args []string) error {
-	spec := filterOptionSpec(false)
+	spec := filterOptionSpec(true)
 	delete(spec, "--top")
 	spec["--verbose"] = false
 	parsed, err := parseCommandOptions(args, spec)
@@ -144,6 +146,13 @@ func applyDefaultTranscriptEpisodeRange(filter shokasession.TranscriptEpisodeFil
 	return filter
 }
 
+func applyDefaultTranscriptEpisodeLimit(filter shokasession.TranscriptEpisodeFilter, parsed parsedOptions) shokasession.TranscriptEpisodeFilter {
+	if parsed.values["--limit"] == "" {
+		filter.Limit = 100
+	}
+	return filter
+}
+
 func transcriptEpisodeFilterFromOptions(parsed parsedOptions) (shokasession.TranscriptEpisodeFilter, error) {
 	values := make(map[string]string, len(parsed.values))
 	for key, value := range parsed.values {
@@ -156,6 +165,13 @@ func transcriptEpisodeFilterFromOptions(parsed parsedOptions) (shokasession.Tran
 		return shokasession.TranscriptEpisodeFilter{}, err
 	}
 	filter := shokasession.TranscriptEpisodeFilter{Filter: baseFilter}
+	if value := parsed.values["--limit"]; value != "" {
+		limit, err := strconv.Atoi(value)
+		if err != nil || limit <= 0 {
+			return shokasession.TranscriptEpisodeFilter{}, fmt.Errorf("invalid --limit: %s", value)
+		}
+		filter.Limit = limit
+	}
 	if eventType == "" {
 		return filter, nil
 	}
@@ -548,6 +564,10 @@ func encodeJSON(value any) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(value)
+}
+
+func encodeCompactJSON(value any) error {
+	return json.NewEncoder(os.Stdout).Encode(value)
 }
 
 func oneLine(value string) string {

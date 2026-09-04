@@ -27,6 +27,28 @@ func TestDefaultTranscriptEpisodeListRange(t *testing.T) {
 	}
 }
 
+func TestTranscriptEpisodeListDefaultsAndLimit(t *testing.T) {
+	parsed := parsedOptions{values: map[string]string{}, booleans: map[string]bool{}}
+	filter, err := transcriptEpisodeFilterFromOptions(parsed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	filter = applyDefaultTranscriptEpisodeLimit(filter, parsed)
+	if filter.Limit != 100 {
+		t.Fatalf("default episode limit = %d", filter.Limit)
+	}
+
+	parsed.values["--limit"] = "25"
+	filter, err = transcriptEpisodeFilterFromOptions(parsed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	filter = applyDefaultTranscriptEpisodeLimit(filter, parsed)
+	if filter.Limit != 25 {
+		t.Fatalf("explicit episode limit = %d", filter.Limit)
+	}
+}
+
 func TestSessionCLIWorkflow(t *testing.T) {
 	home := t.TempDir()
 	stateDir := filepath.Join(t.TempDir(), "state")
@@ -48,8 +70,23 @@ func TestSessionCLIWorkflow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data = append(data, []byte(`{"timestamp":"2026-08-20T01:00:06Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Design direction: use the canonical queryless episode list."}]}}
+	data = append(data, []byte(`{"timestamp":"2026-08-20T01:00:05.500Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","call_id":"call-large-output","arguments":{"cmd":"generate large output"}}}
+{"timestamp":"2026-08-20T01:00:06Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Design direction: use the canonical queryless episode list."}]}}
 `)...)
+	largeToolOutput, err := json.Marshal(map[string]any{
+		"timestamp": "2026-08-20T01:00:07Z",
+		"type":      "response_item",
+		"payload": map[string]any{
+			"type":    "function_call_output",
+			"call_id": "call-large-output",
+			"output":  strings.Repeat("oversized tool payload: result! ", 20_000),
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = append(data, largeToolOutput...)
+	data = append(data, '\n')
 	logPath := filepath.Join(home, ".codex", "sessions", "codex.jsonl")
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o700); err != nil {
 		t.Fatal(err)
@@ -99,20 +136,49 @@ func TestSessionCLIWorkflow(t *testing.T) {
 	if len(listedEpisodes) != 1 {
 		t.Fatalf("unexpected design episodes: %+v", listedEpisodes)
 	}
-	if _, ok := listedEpisodes[0]["context_before"]; ok {
-		t.Fatalf("episode list included detail payload: %+v", listedEpisodes[0])
+	wantListKeys := map[string]bool{"episode_id": true, "timestamp": true, "event_type": true}
+	if len(listedEpisodes[0]) != len(wantListKeys) {
+		t.Fatalf("episode list included non-minimal metadata: %+v", listedEpisodes[0])
 	}
-	if _, ok := listedEpisodes[0]["schema_version"]; ok {
-		t.Fatalf("episode list included export schema: %+v", listedEpisodes[0])
+	for key := range listedEpisodes[0] {
+		if !wantListKeys[key] {
+			t.Fatalf("episode list included unexpected field %q: %+v", key, listedEpisodes[0])
+		}
 	}
-	trigger, ok := listedEpisodes[0]["trigger"].(map[string]any)
-	if !ok || trigger["type"] != "design_direction" || trigger["timestamp"] != "2026-08-20T01:00:06Z" {
-		t.Fatalf("unexpected design trigger: %+v", listedEpisodes[0]["trigger"])
+	if strings.Contains(episodeListOutput, "oversized tool payload") {
+		t.Fatal("episode list included oversized tool output")
+	}
+	if len(episodeListOutput) > 4<<10 {
+		t.Fatalf("metadata-only episode list is unexpectedly large: %d bytes", len(episodeListOutput))
+	}
+	if listedEpisodes[0]["event_type"] != "design_direction" || listedEpisodes[0]["timestamp"] != "2026-08-20T01:00:06Z" {
+		t.Fatalf("unexpected design episode: %+v", listedEpisodes[0])
+	}
+	if strings.Contains(episodeListOutput, "\n  ") {
+		t.Fatalf("episode list JSON was pretty printed: %q", episodeListOutput)
+	}
+	designEpisodeID, ok := listedEpisodes[0]["episode_id"].(string)
+	if !ok || designEpisodeID == "" {
+		t.Fatalf("episode list lacks an exportable id: %+v", listedEpisodes[0])
+	}
+	designEpisodePath := filepath.Join(t.TempDir(), "design-episode.json")
+	if err := cmdTranscript(env, []string{"episode", "export", designEpisodeID, "--output", designEpisodePath}); err != nil {
+		t.Fatal(err)
+	}
+	designEpisode, err := os.ReadFile(designEpisodePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(designEpisode), `"text_truncated": true`) || !strings.Contains(string(designEpisode), `"text_original_bytes":`) || !strings.Contains(string(designEpisode), `"text_omitted_bytes":`) {
+		t.Fatalf("episode export lacks truncation metadata: %s", designEpisode)
+	}
+	if strings.Contains(string(designEpisode), `"additional_corrections"`) {
+		t.Fatalf("episode export included deprecated correction duplicates: %s", designEpisode)
 	}
 	plainEpisodeListOutput := captureStdout(t, func() error {
 		return cmdTranscript(env, []string{"episode", "list", "--agent", "codex", "--event-type", "design_direction", "--from", "2026-08-20", "--to", "2026-08-20"})
 	})
-	if !strings.Contains(plainEpisodeListOutput, "2026-08-20T01:00:06Z") || !strings.Contains(plainEpisodeListOutput, "trigger=design_direction") {
+	if !strings.Contains(plainEpisodeListOutput, "2026-08-20T01:00:06Z") || !strings.Contains(plainEpisodeListOutput, "event_type=design_direction") {
 		t.Fatalf("episode list output lacks date or trigger: %s", plainEpisodeListOutput)
 	}
 	summaryOutput := captureStdout(t, func() error {
@@ -258,6 +324,10 @@ func TestSessionCLIRejectsUnknownFlags(t *testing.T) {
 	err = cmdTranscript(env, []string{"episode", "list", "--before", "3"})
 	if err == nil || !strings.Contains(err.Error(), "unknown flag") {
 		t.Fatalf("episode list accepted detail options: %v", err)
+	}
+	err = cmdTranscript(env, []string{"episode", "list", "--limit", "0"})
+	if err == nil || !strings.Contains(err.Error(), "invalid --limit") {
+		t.Fatalf("episode list accepted invalid limit: %v", err)
 	}
 }
 

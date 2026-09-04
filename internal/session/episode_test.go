@@ -94,6 +94,49 @@ func TestEpisodeBudgetRecordsOmissions(t *testing.T) {
 	}
 }
 
+func TestEpisodeCorrectionsAreUniqueAndTruncationMetadataIsRetained(t *testing.T) {
+	events := []Event{
+		{ID: 1, Role: RoleUser, Kind: KindUserCorrection, Text: "correct this", Source: testSource("anchor", 1)},
+		{
+			ID: 2, Role: RoleUser, Kind: KindMessage, Text: "Design direction: use the stable contract",
+			TextTruncated: true, TextOriginalBytes: 100, TextSHA256: "text-digest",
+			Command: "cmd", CommandTruncated: true, CommandOriginalBytes: 10, CommandSHA256: "command-digest",
+			Diff: "diff", DiffTruncated: true, DiffOriginalBytes: 12, DiffSHA256: "diff-digest",
+			Source: testSource("later", 2),
+		},
+	}
+	episode, err := BuildTranscriptEpisodeFromEvents(TranscriptBuildInput{
+		Session: SessionInfo{SessionUID: "s", ProjectID: "p", TaskLineageID: "l"},
+		Events:  events, AnchorIndex: 0, Options: EpisodeOptions{After: 10},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(episode.Corrections) != 2 {
+		t.Fatalf("corrections = %+v", episode.Corrections)
+	}
+	if len(episode.AdditionalCorrections) != 0 {
+		t.Fatalf("additional corrections duplicate corrections: %+v", episode.AdditionalCorrections)
+	}
+	later := episode.Corrections[1]
+	if !later.TextTruncated || later.TextOriginalBytes != 100 || later.TextOmittedBytes != 100-len(events[1].Text) || later.TextSHA256 != "text-digest" {
+		t.Fatalf("truncation metadata = %+v", later)
+	}
+	if !later.CommandTruncated || later.CommandOriginalBytes != 10 || later.CommandOmittedBytes != 7 || later.CommandSHA256 != "command-digest" {
+		t.Fatalf("command truncation metadata = %+v", later)
+	}
+	if !later.DiffTruncated || later.DiffOriginalBytes != 12 || later.DiffOmittedBytes != 8 || later.DiffSHA256 != "diff-digest" {
+		t.Fatalf("diff truncation metadata = %+v", later)
+	}
+	encoded, err := json.Marshal(episode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), `"additional_corrections"`) {
+		t.Fatalf("deprecated corrections field was emitted: %s", encoded)
+	}
+}
+
 func TestBuildTranscriptEpisodeRejectsUntraceableEvidence(t *testing.T) {
 	_, err := BuildTranscriptEpisodeFromEvents(TranscriptBuildInput{
 		Session:     SessionInfo{SessionUID: "s", ProjectID: "p", TaskLineageID: "l"},

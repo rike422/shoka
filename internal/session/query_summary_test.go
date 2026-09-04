@@ -96,8 +96,8 @@ func TestSubagentsAreHiddenByDefault(t *testing.T) {
 	home := t.TempDir()
 	env := testEnvironment(home)
 	rootDir := filepath.Join(home, ".cursor", "projects", "tmp", "agent-transcripts", "root-session")
-	writeFixture(t, filepath.Join(rootDir, "root-session.jsonl"), []byte(`{"role":"user","message":{"content":[{"type":"text","text":"root task"}]}}`+"\n"))
-	writeFixture(t, filepath.Join(rootDir, "subagents", "child-session.jsonl"), []byte(`{"role":"assistant","message":{"content":[{"type":"text","text":"child evidence"}]}}`+"\n"))
+	writeFixture(t, filepath.Join(rootDir, "root-session.jsonl"), []byte(`{"role":"user","message":{"content":[{"type":"text","text":"Design direction: use the root contract"}]}}`+"\n"))
+	writeFixture(t, filepath.Join(rootDir, "subagents", "child-session.jsonl"), []byte(`{"role":"user","message":{"content":[{"type":"text","text":"Design direction: use the child contract"}]}}`+"\n"))
 	if _, err := Sync(context.Background(), SyncOptions{Environment: env, Agents: []Agent{AgentCursor}}); err != nil {
 		t.Fatal(err)
 	}
@@ -114,6 +114,20 @@ func TestSubagentsAreHiddenByDefault(t *testing.T) {
 	}
 	if len(all) != 2 {
 		t.Fatalf("include-subagents should contain two sessions: %+v", all)
+	}
+	rootEpisodes, err := ListTranscriptEpisodeSummaries(context.Background(), env, TranscriptEpisodeFilter{Filter: Filter{Agent: AgentCursor}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rootEpisodes) != 1 {
+		t.Fatalf("default episode list should contain one root: %+v", rootEpisodes)
+	}
+	allEpisodes, err := ListTranscriptEpisodeSummaries(context.Background(), env, TranscriptEpisodeFilter{Filter: Filter{Agent: AgentCursor, IncludeSubagents: true}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(allEpisodes) != 2 {
+		t.Fatalf("include-subagents episode list should contain two sessions: %+v", allEpisodes)
 	}
 	if all[0].ProjectID == "" || all[1].ProjectID == "" || all[0].ProjectID != all[1].ProjectID || all[0].TaskLineageID != all[1].TaskLineageID {
 		t.Fatalf("parent and child identity diverged: %+v", all)
@@ -212,14 +226,30 @@ func TestTranscriptEpisodeSchemaDocumentMatchesProducerVersion(t *testing.T) {
 	}
 	var schema struct {
 		Properties map[string]struct {
-			Const string `json:"const"`
+			Const      string `json:"const"`
+			Deprecated bool   `json:"deprecated"`
 		} `json:"properties"`
+		Defs map[string]struct {
+			Properties map[string]json.RawMessage `json:"properties"`
+		} `json:"$defs"`
 	}
 	if err := json.Unmarshal(data, &schema); err != nil {
 		t.Fatal(err)
 	}
 	if schema.Properties["schema_version"].Const != transcriptEpisodeVersion {
 		t.Fatalf("episode schema document drifted: %q != %q", schema.Properties["schema_version"].Const, transcriptEpisodeVersion)
+	}
+	if !schema.Properties["additional_corrections"].Deprecated {
+		t.Fatal("additional_corrections is not marked deprecated")
+	}
+	for _, field := range []string{
+		"text_truncated", "text_original_bytes", "text_omitted_bytes", "text_sha256",
+		"command_truncated", "command_original_bytes", "command_omitted_bytes", "command_sha256",
+		"diff_truncated", "diff_original_bytes", "diff_omitted_bytes", "diff_sha256",
+	} {
+		if _, ok := schema.Defs["evidence"].Properties[field]; !ok {
+			t.Errorf("episode evidence schema missing %q", field)
+		}
 	}
 }
 

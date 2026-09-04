@@ -16,6 +16,7 @@ import (
 type TranscriptEpisodeFilter struct {
 	Filter     Filter
 	AnchorType AnchorType
+	Limit      int
 	Verbose    bool
 }
 
@@ -36,14 +37,14 @@ type TranscriptSearchResult struct {
 // TranscriptEpisodeSummary is the metadata-only projection used by list
 // output. It deliberately excludes context and evidence payloads.
 type TranscriptEpisodeSummary struct {
-	EpisodeID       string            `json:"episode_id"`
-	TranscriptID    string            `json:"transcript_id"`
-	NativeSessionID string            `json:"native_session_id"`
-	TaskLineageID   string            `json:"task_lineage_id"`
-	ProjectID       string            `json:"project_id"`
-	WorkspaceID     string            `json:"workspace_id,omitempty"`
-	Trigger         TranscriptTrigger `json:"trigger"`
-	TaskStatus      string            `json:"task_status"`
+	EpisodeID string `json:"episode_id"`
+	Timestamp string `json:"timestamp"`
+	EventType string `json:"event_type"`
+
+	TranscriptID  string `json:"-"`
+	TaskLineageID string `json:"-"`
+	ProjectID     string `json:"-"`
+	TaskStatus    string `json:"-"`
 }
 
 // TranscriptEpisodeAggregate counts lightweight episode metadata without
@@ -60,9 +61,11 @@ type TranscriptEpisodeAggregate struct {
 // ListTranscriptEpisodeSummaries lists matching anchors without constructing
 // the potentially large evidence/context payload for each episode.
 func ListTranscriptEpisodeSummaries(ctx context.Context, env Environment, episodeFilter TranscriptEpisodeFilter) ([]TranscriptEpisodeSummary, error) {
+	if episodeFilter.Limit < 0 {
+		return nil, fmt.Errorf("episode limit must not be negative")
+	}
 	transcriptVerboseLog(episodeFilter.Verbose, "summary list start anchor=%s", episodeFilter.AnchorType)
 	filter := episodeFilter.Filter
-	filter.IncludeSubagents = true
 	sessions, err := listAllSessions(ctx, env, filter)
 	if err != nil {
 		return nil, err
@@ -92,19 +95,21 @@ func ListTranscriptEpisodeSummaries(ctx context.Context, env Environment, episod
 				continue
 			}
 			summaries = append(summaries, TranscriptEpisodeSummary{
-				EpisodeID:       episodeID(session.SessionUID, anchor, anchorType),
-				TranscriptID:    session.SessionUID,
-				NativeSessionID: session.NativeID,
-				TaskLineageID:   session.TaskLineageID,
-				ProjectID:       session.ProjectID,
-				WorkspaceID:     session.WorkspaceID,
-				Trigger:         TranscriptTrigger{Type: string(anchorType), EventID: anchor.ID, Timestamp: anchor.Timestamp},
-				TaskStatus:      episodeTaskStatus(session.Status, events),
+				EpisodeID:     episodeID(session.SessionUID, anchor, anchorType),
+				Timestamp:     anchor.Timestamp,
+				EventType:     string(anchorType),
+				TranscriptID:  session.SessionUID,
+				TaskLineageID: session.TaskLineageID,
+				ProjectID:     session.ProjectID,
+				TaskStatus:    episodeTaskStatus(session.Status, events),
 			})
 		}
 	}
 	transcriptVerboseLog(episodeFilter.Verbose, "summary list complete summaries=%d", len(summaries))
 	sortTranscriptEpisodeSummaries(summaries)
+	if episodeFilter.Limit > 0 && len(summaries) > episodeFilter.Limit {
+		summaries = summaries[:episodeFilter.Limit]
+	}
 	return summaries, nil
 }
 
@@ -146,7 +151,7 @@ func SummarizeTranscriptEpisodeMetadata(summaries []TranscriptEpisodeSummary) Tr
 		if summary.ProjectID != "" {
 			projects[summary.ProjectID] = struct{}{}
 		}
-		result.ByTrigger[summary.Trigger.Type]++
+		result.ByTrigger[summary.EventType]++
 		result.ByStatus[summary.TaskStatus]++
 	}
 	result.Episodes = len(episodes)
@@ -262,10 +267,15 @@ func episodeTriggerInRange(timestamp string, from, to time.Time) bool {
 
 func sortTranscriptEpisodeSummaries(summaries []TranscriptEpisodeSummary) {
 	sort.Slice(summaries, func(i, j int) bool {
-		if summaries[i].TranscriptID != summaries[j].TranscriptID {
-			return summaries[i].TranscriptID < summaries[j].TranscriptID
+		left, leftErr := time.Parse(time.RFC3339Nano, summaries[i].Timestamp)
+		right, rightErr := time.Parse(time.RFC3339Nano, summaries[j].Timestamp)
+		if leftErr == nil && rightErr == nil && !left.Equal(right) {
+			return left.After(right)
 		}
-		return summaries[i].Trigger.EventID < summaries[j].Trigger.EventID
+		if summaries[i].Timestamp != summaries[j].Timestamp {
+			return summaries[i].Timestamp > summaries[j].Timestamp
+		}
+		return summaries[i].EpisodeID < summaries[j].EpisodeID
 	})
 }
 
